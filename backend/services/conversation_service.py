@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 
+from core.config import get_settings
 from core.mode_selector import select_mode
 from core.prompt_builder import build_chat_messages
 from memory.short_term_buffer import (
@@ -16,9 +17,27 @@ from memory.short_term_buffer import (
     get_recent_messages,
     set_last_mode,
 )
+from providers.claude_provider import ClaudeProvider
+from providers.openai_provider import OpenAIProvider
 from providers.ollama_provider import OllamaProvider, looks_like_internal_echo
 
-_provider = OllamaProvider()
+
+def _build_provider() -> OllamaProvider | OpenAIProvider | ClaudeProvider:
+    s = get_settings()
+    p = s.provider.lower().strip()
+    if p == "ollama":
+        return OllamaProvider()
+    if p == "openai":
+        return OpenAIProvider()
+    if p == "claude":
+        return ClaudeProvider()
+    raise ValueError(
+        f"Unknown provider {s.provider!r} (CAELO_PROVIDER). "
+        "Use 'ollama', 'openai', or 'claude'."
+    )
+
+
+_provider = _build_provider()
 
 _PURE_PRESENCE_PATTERNS = (
     r"\b(?:don'?t|do not) fix (?:this|it|that|anything)\b",
