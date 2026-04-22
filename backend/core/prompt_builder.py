@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import re
+from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 # backend/core -> parents[2] is project root (folder that contains `prompts/` and `backend/`)
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -197,6 +199,14 @@ ASSISTANT:
     return prompt
 
 
+def _current_time_context() -> str:
+    """Return a human-readable current date/time string in US Eastern time."""
+    now = datetime.now(ZoneInfo("America/New_York"))
+    # Cross-platform hour formatting (avoid %-I which doesn't work on Windows)
+    hour_12 = now.strftime("%I").lstrip("0") or "12"
+    return now.strftime(f"Current date and time: %A, %B %d, %Y, {hour_12}:%M %p %Z")
+
+
 def build_chat_messages(
     user_input: str,
     mode: str,
@@ -233,6 +243,7 @@ def build_chat_messages(
 
     system_parts = [
         system,
+        _current_time_context(),
         f"Mode: {mode}",
         "Mode policy (internal):\n" + mode_guide,
         "Grounding from the user (stated lines; do not invent beyond these):\n"
