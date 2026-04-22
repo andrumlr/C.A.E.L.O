@@ -6,14 +6,14 @@ Base = declarative_base()
 
 class Conversation(Base):
     __tablename__ = "conversations"
-    id = Column(Integer, primary_key=True)
+    id = Column(String(256), primary_key=True)
     title = Column(String)
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class Message(Base):
     __tablename__ = "messages"
     id = Column(Integer, primary_key=True)
-    conversation_id = Column(Integer)
+    conversation_id = Column(String(256))
     role = Column(String)  # user / assistant
     content = Column(Text)
     mode_used = Column(String)
