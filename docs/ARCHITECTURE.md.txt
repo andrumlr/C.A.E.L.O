@@ -1,0 +1,334 @@
+# ARCHITECTURE.md
+
+## Step 4 — System Architecture
+
+---
+
+# 1. Architecture Goal
+
+Caelo must be:
+
+* local-first
+* modular
+* identity-stable
+* memory-aware
+* hybrid-ready
+
+---
+
+# 2. Recommended Stack
+
+## Desktop shell
+
+* Electron
+
+## Frontend
+
+* React
+* TypeScript
+
+## Backend / orchestration
+
+* Python
+
+## Database
+
+* SQLite
+
+## Local model layer
+
+* abstract model provider interface
+* initial target: local model runtime only
+
+## Future online layer
+
+* provider abstraction for optional cloud access
+
+---
+
+# 3. High-Level System Components
+
+## A. Frontend
+
+Responsibilities:
+
+* chat interface
+* settings UI
+* memory view
+* mode display
+* status indicators
+
+---
+
+## B. Electron Shell
+
+Responsibilities:
+
+* package desktop app
+* manage app window
+* bridge frontend and backend
+
+---
+
+## C. Backend Core
+
+Responsibilities:
+
+* prompt assembly
+* mode selection
+* memory retrieval
+* response generation orchestration
+* save/retrieve session data
+* provider routing
+
+---
+
+## D. Database Layer
+
+Responsibilities:
+
+* conversations
+* messages
+* memory entries
+* settings
+* projects
+* mode state metadata
+
+---
+
+## E. Prompt Engine
+
+Responsibilities:
+
+* combine system identity files
+* apply mode prompts
+* inject memory context
+* produce final model prompt
+
+---
+
+## F. Memory Engine
+
+Responsibilities:
+
+* classify candidate memory
+* retrieve relevant memory
+* manage thresholds
+* store updates
+* decay/archive logic
+
+---
+
+## G. Provider Router
+
+Responsibilities:
+
+* route to local model by default
+* support future hybrid routing
+* enforce permission states
+
+---
+
+# 4. Runtime Model
+
+## Startup flow
+
+1. app launches
+2. frontend loads
+3. backend initializes database
+4. personality and prompt files load
+5. settings are read
+6. default provider is selected
+7. chat session begins
+
+---
+
+## Response flow
+
+1. user sends message
+2. backend classifies intent
+3. mode is selected
+4. relevant memory is retrieved
+5. prompt engine assembles final prompt
+6. provider generates output
+7. response is returned to UI
+8. memory candidate extraction runs
+9. session and message history are saved
+
+---
+
+# 5. Local-First Principle
+
+Default state:
+
+* no online access
+* no external data transfer
+* memory stored locally
+* local model selected by default
+
+Hybrid behavior:
+
+* only enabled by explicit user setting
+* provider router may use external services
+* permissions should be visible in UI
+
+---
+
+# 6. Core Data Domains
+
+## Conversations
+
+Stores sessions and message history
+
+## Memory
+
+Stores preference, project, and user pattern memory
+
+## Settings
+
+Stores model mode, permissions, UI settings, memory behavior
+
+## Identity Assets
+
+Reads static Markdown files from:
+
+* personality/
+* memory/
+* prompts/
+
+---
+
+# 7. Database Tables (Conceptual)
+
+## conversations
+
+* id
+* title
+* created_at
+* updated_at
+
+## messages
+
+* id
+* conversation_id
+* role
+* content
+* mode_used
+* timestamp
+
+## memory_entries
+
+* id
+* category
+* state
+* content
+* weight
+* sensitivity
+* source
+* created_at
+* updated_at
+* last_used_at
+* archived
+
+## settings
+
+* key
+* value
+
+## projects
+
+* id
+* name
+* description
+* status
+* created_at
+* updated_at
+
+---
+
+# 8. Backend Modules
+
+Recommended Python modules:
+
+* config/
+* core/
+* prompts/
+* memory/
+* providers/
+* api/
+* db/
+* services/
+
+---
+
+# 9. Required Core Services
+
+## Mode Selector
+
+Chooses:
+
+* Analysis
+* Execution
+* Advisory
+* Presence
+* Critical
+
+## Prompt Builder
+
+Combines:
+
+* system prompt
+* mode prompt
+* memory context
+* conversation context
+
+## Memory Manager
+
+Handles:
+
+* retrieve
+* create candidate
+* confirm
+* update
+* archive
+
+## Provider Service
+
+Handles:
+
+* local model call
+* future hybrid routing
+
+---
+
+# 10. Frontend Screens
+
+## Main Chat View
+
+* message thread
+* input box
+* model/mode badge
+* status bar
+
+## Settings View
+
+* local-only toggle
+* hybrid-ready toggle
+* memory settings
+* model settings
+
+## Memory View
+
+* saved memory list
+* categories
+* edit/remove controls later
+
+---
+
+# 11. Final Architecture Rule
+
+> All intelligence should route through the defined identity, prompt, and memory layers. No model should answer “raw.”
+
+---
+
+## END OF FILE

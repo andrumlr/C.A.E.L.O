@@ -1,0 +1,135 @@
+# IMPLEMENTATION_PLAN.md
+
+## Step 4 — Build Execution Plan
+
+---
+
+# 1. Objective
+
+Turn the Caelo blueprint into a working V1 desktop application.
+
+---
+
+# 2. Implementation Order
+
+## Phase A — Repository Setup
+
+Create:
+
+* root folders
+* package structure
+* Python backend scaffold
+* Electron + React frontend scaffold
+
+---
+
+## Phase B — Data Layer
+
+Implement:
+
+* SQLite database
+* conversation storage
+* message storage
+* memory storage
+* settings storage
+
+---
+
+## Phase C — Prompt Layer
+
+Implement:
+
+* file loader for Markdown system files
+* prompt builder
+* mode prompt selector
+* memory context injector
+
+---
+
+## Phase D — Response Layer
+
+Implement:
+
+* provider interface
+* local model provider
+* mode selection service
+* response orchestration pipeline
+
+---
+
+## Phase E — Frontend UI
+
+Implement:
+
+* chat layout
+* message rendering
+* input form
+* settings screen
+* memory view placeholder
+
+---
+
+## Phase F — Integration
+
+Connect:
+
+* frontend message input to backend API
+* backend response pipeline to UI
+* memory save and retrieval
+* settings persistence
+
+---
+
+## Phase G — Testing and Refinement
+
+Validate:
+
+* identity consistency
+* stable formatting
+* memory correctness
+* local-only behavior
+* app startup reliability
+
+---
+
+# 3. Minimum Viable Backend Features
+
+* send message endpoint
+* retrieve chat history endpoint
+* load settings endpoint
+* update settings endpoint
+* retrieve memory endpoint
+
+---
+
+# 4. Minimum Viable Frontend Features
+
+* start app
+* create/open conversation
+* send and receive messages
+* show mode used
+* settings pane
+* memory pane placeholder
+
+---
+
+# 5. Deferred Features
+
+Do not build in first pass:
+
+* voice
+* smart home control
+* advanced automation
+* multi-agent orchestration
+* external provider switching UI complexity
+* emotional progression dashboards
+
+---
+
+# 6. Completion Rule
+
+> A simpler working Caelo is better than a complex unfinished shell.
+
+---
+
+## END OF FILE

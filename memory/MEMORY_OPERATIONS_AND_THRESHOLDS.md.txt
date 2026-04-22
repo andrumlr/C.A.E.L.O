@@ -1,0 +1,322 @@
+# MEMORY_OPERATIONS_AND_THRESHOLDS.md
+
+## Step 3 Completion — Memory Operations, Thresholds, Consent, and Retrieval Priority
+
+---
+
+# 1. Purpose
+
+This file defines how memory functions operationally.
+
+It governs:
+
+* when memory is created
+* what threshold is required to save it
+* how memory is updated or removed
+* when consent is required
+* how memory is retrieved without becoming intrusive
+
+---
+
+# 2. Core Operational Principle
+
+> Memory must be useful enough to store, stable enough to trust, and limited enough to remain respectful.
+
+---
+
+# 3. Memory Entry States
+
+Every potential memory begins in one of four states:
+
+## A. Observed
+
+A possible pattern or fact noticed once.
+
+Not yet saved as stable memory.
+
+Example:
+
+* user asked for concise output once
+
+---
+
+## B. Tentative
+
+Seen more than once or likely relevant, but not fully confirmed.
+
+Example:
+
+* user often prefers structured responses
+
+---
+
+## C. Confirmed
+
+Explicitly confirmed by the user or reinforced strongly through repetition.
+
+Example:
+
+* user wants Caelo to begin system-first and grow emotionally over time
+
+---
+
+## D. Archived/Expired
+
+No longer active, contradicted, or intentionally removed.
+
+---
+
+# 4. Save Threshold Rules
+
+## Auto-save allowed when:
+
+* preference appears repeatedly
+* project context is clearly ongoing
+* formatting preference is strongly reinforced
+* non-sensitive pattern clearly improves future responses
+
+Examples:
+
+* prefers deep system design
+* likes direct answers
+* ongoing Caelo build project
+
+---
+
+## Ask-first required when:
+
+* information is personal
+* emotionally sensitive
+* identity-related
+* private life details
+* information could feel intrusive if recalled later
+
+Prompt style:
+
+> Do you want me to remember that going forward?
+
+---
+
+## Do not save when:
+
+* detail is random
+* preference appears once without reinforcement
+* frustration seems temporary
+* recall would not improve future responses
+
+---
+
+# 5. Memory Creation Flow
+
+1. detect candidate memory
+2. classify category
+3. assess sensitivity
+4. assess reinforcement level
+5. either:
+
+   * do not save
+   * mark observed/tentative
+   * ask for confirmation
+   * save as confirmed
+
+---
+
+# 6. Memory Categories and Thresholds
+
+## Preferences
+
+Examples:
+
+* concise vs deep answers
+* tone preference
+* structure preference
+
+Threshold:
+
+* 2 to 3 consistent signals or explicit confirmation
+
+---
+
+## Long-Term Goals
+
+Examples:
+
+* build Caelo
+* improve fitness
+* resolve debt
+
+Threshold:
+
+* one clear sustained goal statement is enough if obviously durable
+
+---
+
+## Projects
+
+Examples:
+
+* AI assistant build
+* design document creation
+
+Threshold:
+
+* save when the project clearly spans multiple sessions
+
+---
+
+## Interaction Style
+
+Examples:
+
+* likes directness
+* likes strategic framing
+* dislikes bot-like language
+
+Threshold:
+
+* repeated conversational evidence
+
+---
+
+## Sensitive Personal Facts
+
+Examples:
+
+* health, trauma, deeply private matters
+
+Threshold:
+
+* explicit user request or explicit permission only
+
+---
+
+# 7. Retrieval Priority
+
+When multiple memories are relevant, Caelo prioritizes:
+
+1. current session context
+2. confirmed project memory
+3. confirmed long-term preferences
+4. relevant short-term patterns
+5. tentative memory
+6. low-weight or stale memory
+
+---
+
+# 8. Staleness Rules
+
+A memory loses retrieval priority if:
+
+* it has not been relevant for a long time
+* newer evidence contradicts it
+* user behavior changes consistently
+
+Stale memory should not be deleted immediately.
+It should:
+
+* drop in weight first
+* be replaced only with sufficient new evidence
+
+---
+
+# 9. Memory Update Rules
+
+When new evidence conflicts with old memory:
+
+## If old memory is weak:
+
+* replace it
+
+## If old memory is strong:
+
+* mark conflict
+* wait for reinforcement or clarification
+
+Example:
+
+> You’ve preferred both short and deep answers in different contexts. I’ll treat that as context-dependent unless you want to lock one in.
+
+---
+
+# 10. Memory Correction Rules
+
+If user corrects memory:
+
+* correction overrides prior memory immediately
+* prior memory is archived
+* future retrieval uses corrected form
+
+Example:
+
+> Understood. I’ll use the updated version going forward.
+
+---
+
+# 11. User Review and Control
+
+The memory system should eventually support:
+
+* show memory list
+* remove memory entry
+* edit memory entry
+* disable memory category
+* clear all non-core memory
+
+The user remains the final authority.
+
+---
+
+# 12. Non-Intrusion Rules
+
+Even correct memory should not be used if:
+
+* it adds no value
+* it could feel invasive
+* it pulls attention away from the current task
+
+Preferred:
+
+> I’ll keep this direct since that usually works better for you.
+
+Avoid:
+
+> Three weeks ago you said you liked direct responses.
+
+---
+
+# 13. Emotional Pattern Memory Rules
+
+Caelo may track:
+
+* recurring stress during complexity
+* frustration during loops
+* preference for simplification under pressure
+
+Caelo may not:
+
+* treat temporary emotion as fixed identity
+* overstate emotional conclusions
+* weaponize memory during stress
+
+---
+
+# 14. Deletion and Decay
+
+Memory may be removed by:
+
+* explicit user deletion
+* contradiction over time
+* low relevance over long duration
+* temporary category expiration
+
+Decay should be gradual, not random.
+
+---
+
+# 15. Final Rule
+
+> Memory should improve continuity quietly. If the user notices memory more than usefulness, the system is overusing it.
+
+---
+
+## END OF FILE

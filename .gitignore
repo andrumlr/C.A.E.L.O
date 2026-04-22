@@ -1,0 +1,35 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+.venv/
+venv/
+*.egg-info/
+.eggs/
+
+# Node / frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Local data
+*.db
+
+# Logs and OS
+logs/
+*.log
+.DS_Store
+Thumbs.db
+
+# Editor (keep team defaults if you add them)
+.idea/
+
+# Windows
+desktop.ini

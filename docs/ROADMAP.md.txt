@@ -1,0 +1,154 @@
+# ROADMAP.md
+
+## Step 4 — Build Roadmap
+
+---
+
+# 1. Purpose
+
+This roadmap defines the order in which Caelo should be implemented.
+
+The build must prioritize:
+
+* identity consistency
+* local-first operation
+* memory stability
+* mode-based behavior
+* clean extensibility
+
+---
+
+# 2. Product Goal
+
+Build a local-first AI assistant named Caelo that:
+
+* operates with a stable system-first identity
+* can optionally connect to online services
+* supports persistent memory
+* routes responses through defined behavior and mode systems
+* evolves in familiarity over time without losing structure
+
+---
+
+# 3. Version Roadmap
+
+## V1 — Local Text Core
+
+Goal:
+
+* working desktop chat app
+* local memory
+* local-first model routing
+* system prompt integration
+* mode switching
+* memory save/retrieval
+
+Includes:
+
+* chat UI
+* settings panel
+* memory panel
+* local database
+* local model support
+* hybrid toggle placeholder
+
+---
+
+## V1.5 — Hybrid Intelligence Layer
+
+Goal:
+
+* optional web-enabled mode
+* optional external model routing
+* permission system for online tools
+
+Includes:
+
+* online toggle
+* ask-first mode
+* web request layer
+* provider routing abstraction
+
+---
+
+## V2 — Tool and Action Layer
+
+Goal:
+
+* controlled system capability
+
+Includes:
+
+* file access
+* automation hooks
+* app launching
+* command execution with permission
+
+---
+
+## V3 — Voice and Presence
+
+Goal:
+
+* spoken interaction layer
+
+Includes:
+
+* speech-to-text
+* text-to-speech
+* pause/interrupt handling
+* voice identity tuning
+
+---
+
+# 4. Immediate Build Priority
+
+Current target:
+
+> V1 — Local Text Core
+
+Do not build voice first.
+Do not build complex automation first.
+Do not build “self-awareness” features first.
+
+The first win is:
+
+> Caelo in a desktop app, with memory, modes, and stable personality.
+
+---
+
+# 5. Build Sequence
+
+1. Create repository and file structure
+2. Build backend configuration and model routing
+3. Build local database and memory tables
+4. Build prompt assembly layer
+5. Build frontend chat interface
+6. Connect frontend to backend
+7. Add memory panel and settings
+8. Add local/hybrid mode switching
+9. Test personality consistency
+10. Refine response quality and routing
+
+---
+
+# 6. V1 Success Criteria
+
+V1 is complete when:
+
+* Caelo can chat in a local desktop app
+* identity remains stable
+* memory is saved and retrieved correctly
+* mode selection affects response handling
+* settings allow local-only and hybrid-ready behavior
+* responses feel consistent with the written system files
+
+---
+
+# 7. Final Roadmap Rule
+
+> Build for coherence first, capability second.
+
+---
+
+## END OF FILE

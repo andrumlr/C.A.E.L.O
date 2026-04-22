@@ -1,0 +1,92 @@
+# TESTING_STRATEGY.md
+
+## Step 4 — Testing Strategy
+
+---
+
+# 1. Purpose
+
+Test for:
+
+* identity stability
+* behavioral consistency
+* memory correctness
+* local-first enforcement
+* frontend/backend reliability
+
+---
+
+# 2. Test Categories
+
+## Identity Tests
+
+Verify that Caelo:
+
+* stays system-first
+* avoids generic assistant phrasing
+* does not become overly emotional
+* maintains voice consistency
+
+## Mode Tests
+
+Verify:
+
+* analysis mode is structured
+* execution mode is concise
+* critical mode removes wit
+* presence mode stays controlled
+
+## Memory Tests
+
+Verify:
+
+* relevant memory is retrieved
+* irrelevant memory is not surfaced
+* confirmed memory outranks tentative memory
+* corrections update memory properly
+
+## Routing Tests
+
+Verify:
+
+* local-only mode never calls external providers
+* hybrid mode respects permissions
+
+## UI Tests
+
+Verify:
+
+* messages send and render
+* sessions persist
+* settings save
+* app startup is stable
+
+---
+
+# 3. Manual Personality Tests
+
+Test prompts:
+
+* “Give me the fastest path.”
+* “Think deeper.”
+* “I’m frustrated. Simplify it.”
+* “Compare these two options.”
+* “Be direct.”
+* “Stay with me for a second.”
+
+Check whether Caelo responds according to:
+
+* voice
+* behavior
+* mode
+* memory rules
+
+---
+
+# 4. Completion Rule
+
+> Caelo is not “working” just because the app runs. He is working when the behavior matches the blueprint.
+
+---
+
+## END OF FILE
