@@ -35,3 +35,12 @@ class Setting(Base):
     __tablename__ = "settings"
     key = Column(String, primary_key=True)
     value = Column(String)
+
+
+class Summary(Base):
+    __tablename__ = "summaries"
+    id = Column(Integer, primary_key=True)
+    content = Column(Text)
+    message_count_at_creation = Column(Integer)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
