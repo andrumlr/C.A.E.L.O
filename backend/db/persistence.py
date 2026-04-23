@@ -60,3 +60,31 @@ def save_exchange(
         print(f"[persistence] save_exchange failed: {e}")
     finally:
         session.close()
+
+
+def get_recent_messages_from_db(limit: int = 20) -> list[dict[str, str]]:
+    """
+    Return the most recent messages globally, in chronological order.
+    Cross-session memory — pulls from any conversation, not just the current one.
+    Returns a list of {"role": ..., "content": ...} dicts ready for the LLM.
+    """
+    session = SessionLocal()
+    try:
+        rows = (
+            session.query(Message)
+            .order_by(Message.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        # DB returned newest-first; reverse into chronological (oldest-first) order
+        rows.reverse()
+        return [
+            {"role": m.role, "content": m.content}
+            for m in rows
+            if m.role in ("user", "assistant") and (m.content or "").strip()
+        ]
+    except Exception as e:
+        print(f"[persistence] get_recent_messages_from_db failed: {e}")
+        return []
+    finally:
+        session.close()

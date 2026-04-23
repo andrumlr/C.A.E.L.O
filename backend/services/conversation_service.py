@@ -11,7 +11,7 @@ import re
 from core.config import get_settings
 from core.mode_selector import select_mode
 from core.prompt_builder import build_chat_messages
-from db.persistence import save_exchange
+from db.persistence import save_exchange, get_recent_messages_from_db
 from memory.short_term_buffer import (
     append_exchange,
     get_last_mode,
@@ -114,7 +114,12 @@ def run_chat(
     inferred_mode = select_mode(user_message)
     previous_mode = get_last_mode(conversation_id)
     mode = _resolve_effective_mode(user_message, inferred_mode, previous_mode)
-    recent_raw = get_recent_messages(conversation_id)
+    db_recent = get_recent_messages_from_db(limit=20)
+    if db_recent:
+        recent_raw = db_recent
+    else:
+        recent_raw = get_recent_messages(conversation_id)
+
     # Skip any historical assistant turns that look like leaked internals.
     recent = [
         m
