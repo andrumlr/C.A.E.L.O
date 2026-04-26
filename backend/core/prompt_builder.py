@@ -213,6 +213,7 @@ def build_chat_messages(
     *,
     memory_context: str = "",
     recent_messages: list[dict[str, str]] | None = None,
+    summary_text: str = "",
 ) -> list[dict[str, str]]:
     """
     Build Ollama messages: one system block (identity, runtime safeguards, active mode,
@@ -244,12 +245,21 @@ def build_chat_messages(
     system_parts = [
         system,
         _current_time_context(),
+    ]
+
+    if summary_text and summary_text.strip():
+        system_parts.append(
+            "Long-term memory of the user (cumulative summary of past conversations):\n"
+            + summary_text.strip()
+        )
+
+    system_parts.extend([
         f"Mode: {mode}",
         "Mode policy (internal):\n" + mode_guide,
         "Grounding from the user (stated lines; do not invent beyond these):\n"
         + established_facts,
         "Long-term memory (reference only, not dialogue):\n" + memory_block,
-    ]
+    ])
     if hist:
         system_parts.append(_CONTINUITY_RULES)
 

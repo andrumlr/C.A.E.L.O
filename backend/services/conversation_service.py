@@ -12,7 +12,7 @@ from core.config import get_settings
 from core.mode_selector import select_mode
 from core.prompt_builder import build_chat_messages
 from db.persistence import save_exchange, get_recent_messages_from_db
-from memory.summary_generator import maybe_generate_summary
+from memory.summary_generator import maybe_generate_summary, get_current_summary
 from memory.short_term_buffer import (
     append_exchange,
     get_last_mode,
@@ -130,11 +130,13 @@ def run_chat(
             and looks_like_internal_echo((m.get("content") or "").strip())
         )
     ]
+    summary_text = get_current_summary()
     messages = build_chat_messages(
         user_message,
         mode,
         memory_context=memory_context,
         recent_messages=recent,
+        summary_text=summary_text,
     )
     text = _provider.generate_messages(messages)
     # Never persist leaked/system-looking output into short-term history.
