@@ -12,6 +12,7 @@ from core.config import get_settings
 from core.mode_selector import select_mode
 from core.prompt_builder import build_chat_messages
 from db.persistence import save_exchange, get_recent_messages_from_db
+from memory.fact_extractor import maybe_extract_facts
 from memory.summary_generator import maybe_generate_summary, get_current_summary
 from memory.short_term_buffer import (
     append_exchange,
@@ -144,5 +145,6 @@ def run_chat(
         append_exchange(conversation_id, user_message, text)
         save_exchange(conversation_id, user_message, text, mode)
         maybe_generate_summary()
+        maybe_extract_facts()
         set_last_mode(conversation_id, mode)
     return {"response": text, "mode": mode}
