@@ -1,10 +1,6 @@
 from fastapi import APIRouter, UploadFile
-from services.document_service import (
-    MAX_FILE_BYTES,
-    EmptyDocument,
-    UnsupportedFileType,
-    ingest_document,
-)
+from core.errors import safe_error_response
+from services.document_service import MAX_FILE_BYTES, ingest_document
 
 router = APIRouter()
 
@@ -19,7 +15,5 @@ async def upload_document(file: UploadFile):
                 "error_message": f"File is too large. Max size is {MAX_FILE_BYTES // (1024 * 1024)} MB.",
             }
         return ingest_document(file.filename or "upload", data)
-    except (UnsupportedFileType, EmptyDocument) as e:
-        return {"error_type": type(e).__name__, "error_message": str(e)}
     except Exception as e:
-        return {"error_type": type(e).__name__, "error_message": str(e)}
+        return safe_error_response(e, log_prefix="documents")

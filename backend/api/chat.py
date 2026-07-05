@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
+from core.errors import safe_error_response
 from services.conversation_service import run_chat
 
 router = APIRouter()
@@ -26,7 +27,4 @@ def chat(input: ChatRequest):
 
         return run_chat(user_input, conversation_id=input.conversation_id)
     except Exception as e:
-        return {
-            "error_type": type(e).__name__,
-            "error_message": str(e),
-        }
+        return safe_error_response(e, log_prefix="chat")
