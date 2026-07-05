@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 
 from db.database import SessionLocal
+from db.models import Document
 from db.persistence import save_message
 from memory.fact_extractor import _merge_facts, _parse_extraction_response
 from providers.claude_provider import ClaudeProvider
@@ -106,6 +107,7 @@ def ingest_document(filename: str, data: bytes) -> dict:
     session = SessionLocal()
     try:
         saved = _merge_facts(session, facts) if facts else 0
+        session.add(Document(filename=filename, facts_saved=saved, summary=summary))
         session.commit()
     except Exception:
         session.rollback()
@@ -125,3 +127,29 @@ def ingest_document(filename: str, data: bytes) -> dict:
         "facts_saved": saved,
         "summary": summary,
     }
+
+
+def list_documents(limit: int = 100) -> list[dict]:
+    """Return past uploads, newest first."""
+    session = SessionLocal()
+    try:
+        rows = (
+            session.query(Document)
+            .order_by(Document.uploaded_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return [
+            {
+                "filename": d.filename,
+                "facts_saved": d.facts_saved,
+                "summary": d.summary,
+                "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
+            }
+            for d in rows
+        ]
+    except Exception as e:
+        print(f"[document_service] list_documents failed: {e}")
+        return []
+    finally:
+        session.close()

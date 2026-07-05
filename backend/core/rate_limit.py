@@ -15,9 +15,11 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 _WINDOW_SECONDS = 60
-_LIMITS: dict[str, int] = {
-    "/chat/": 20,
-    "/documents/": 6,
+# Keyed by (method, path) — only the expensive write endpoints are limited;
+# read-only listing endpoints (GET /documents/, /conversations/) are unrestricted.
+_LIMITS: dict[tuple[str, str], int] = {
+    ("POST", "/chat/"): 20,
+    ("POST", "/documents/"): 6,
 }
 
 _lock = Lock()
@@ -33,8 +35,8 @@ def _client_ip(request: Request) -> str:
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        limit = _LIMITS.get(request.url.path)
-        if limit is not None and request.method != "OPTIONS":
+        limit = _LIMITS.get((request.method, request.url.path))
+        if limit is not None:
             key = (request.url.path, _client_ip(request))
             now = time.monotonic()
             with _lock:

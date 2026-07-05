@@ -44,3 +44,12 @@ class Summary(Base):
     message_count_at_creation = Column(Integer)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class Document(Base):
+    __tablename__ = "documents"
+    id = Column(Integer, primary_key=True)
+    filename = Column(String)
+    facts_saved = Column(Integer, default=0)
+    summary = Column(Text)
+    uploaded_at = Column(DateTime, default=datetime.utcnow)

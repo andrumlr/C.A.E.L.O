@@ -13,6 +13,14 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .chat-header h1 {
@@ -86,6 +94,65 @@
   border: 1px dashed #2a3144;
   font-size: 0.85rem;
   max-width: 90%;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.panel-header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #e9ebf7;
+  font-weight: 600;
+}
+
+.list-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  border: 1px solid #2a3144;
+  background: #0f1420;
+  border-radius: 10px;
+  padding: 10px 12px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.list-item:hover {
+  background: #171d2c;
+}
+
+.list-item.static {
+  cursor: default;
+}
+
+.list-item.static:hover {
+  background: #0f1420;
+}
+
+.list-item-preview {
+  color: #e9efff;
+  font-weight: 500;
+}
+
+.list-item-meta {
+  color: #6f7898;
+  font-size: 0.78rem;
+}
+
+.list-item-summary {
+  margin: 4px 0 0;
+  color: #b7bedb;
+  font-size: 0.88rem;
+  line-height: 1.4;
 }
 
 .mode-tag {

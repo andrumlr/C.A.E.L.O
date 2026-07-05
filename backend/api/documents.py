@@ -1,8 +1,13 @@
 from fastapi import APIRouter, UploadFile
 from core.errors import safe_error_response
-from services.document_service import MAX_FILE_BYTES, ingest_document
+from services.document_service import MAX_FILE_BYTES, ingest_document, list_documents
 
 router = APIRouter()
+
+
+@router.get("/")
+def get_documents():
+    return list_documents()
 
 
 @router.post("/")
