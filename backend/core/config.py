@@ -35,6 +35,7 @@ class Settings:
     openai_model: str
     anthropic_api_key: str
     claude_model: str
+    api_key: str
 
 
 def get_settings() -> Settings:
@@ -47,4 +48,5 @@ def get_settings() -> Settings:
         openai_model=_env_str("OPENAI_MODEL", "gpt-4o"),
         anthropic_api_key=_env_str("ANTHROPIC_API_KEY", ""),
         claude_model=_env_str("CLAUDE_MODEL", "claude-sonnet-4-5"),
+        api_key=_env_str("CAELO_API_KEY", ""),
     )

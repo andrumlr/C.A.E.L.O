@@ -28,6 +28,8 @@ const ACCEPTED_DOCUMENT_EXTENSIONS = '.txt,.md,.pdf,.docx'
 
 const STORAGE_KEY = 'caelo.conversation_id'
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
+const API_KEY = import.meta.env.VITE_API_KEY ?? ''
+const AUTH_HEADERS: HeadersInit = API_KEY ? { 'X-API-Key': API_KEY } : {}
 
 function createConversationId(): string {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -83,7 +85,7 @@ function App() {
     try {
       const apiResponse = await fetch(`${API_BASE}/chat/`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
         body: JSON.stringify({
           message: trimmed,
           conversation_id: conversationId,
@@ -131,6 +133,7 @@ function App() {
 
       const apiResponse = await fetch(`${API_BASE}/documents/`, {
         method: 'POST',
+        headers: AUTH_HEADERS,
         body: formData,
       })
 

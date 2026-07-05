@@ -2,10 +2,11 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.chat import router as chat_router
 from api.documents import router as documents_router
+from core.auth import require_api_key
 from core.rate_limit import RateLimitMiddleware
 from db.database import init_db
 
@@ -22,5 +23,5 @@ app.add_middleware(RateLimitMiddleware)
 
 init_db()
 
-app.include_router(chat_router, prefix="/chat")
-app.include_router(documents_router, prefix="/documents")
+app.include_router(chat_router, prefix="/chat", dependencies=[Depends(require_api_key)])
+app.include_router(documents_router, prefix="/documents", dependencies=[Depends(require_api_key)])
