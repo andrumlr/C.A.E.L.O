@@ -32,6 +32,16 @@ Rules:
 - If you can't find clear facts, return an empty array []
 - Do NOT include markdown code fences in your response — just the raw JSON array"""
 
+DOCUMENT_SUMMARY_SYSTEM_PROMPT = """You are Caelo. A user just uploaded a document — summarize it in your own voice: direct, no padding, no throat-clearing.
+
+Write 3-6 sentences covering what the document actually says — the key points, decisions, or facts a person would want without reading it themselves.
+
+Rules:
+- Do NOT start with "Here is a summary" or any preamble — go straight into the content
+- Plain prose only — no markdown, no bullet points, no headers
+- Be concrete: names, numbers, specifics beat vague generalities
+- If the document is thin or mostly boilerplate, say so plainly instead of padding"""
+
 
 class UnsupportedFileType(ValueError):
     pass
@@ -84,6 +94,13 @@ def ingest_document(filename: str, data: bytes) -> dict:
     facts = _parse_extraction_response(response)
     facts = [{**f, "content": f"From {filename}: {f['content']}"} for f in facts]
 
+    summary = provider.generate_messages(
+        [
+            {"role": "system", "content": DOCUMENT_SUMMARY_SYSTEM_PROMPT},
+            {"role": "user", "content": f"Document: {filename}\n\n{excerpt}\n\nSummarize it now."},
+        ]
+    ).strip()
+
     session = SessionLocal()
     try:
         saved = _merge_facts(session, facts) if facts else 0
@@ -104,4 +121,5 @@ def ingest_document(filename: str, data: bytes) -> dict:
         "filename": filename,
         "chars_extracted": len(text),
         "facts_saved": saved,
+        "summary": summary,
     }

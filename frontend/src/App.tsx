@@ -20,6 +20,7 @@ type DocumentUploadResponse = {
   filename?: string
   chars_extracted?: number
   facts_saved?: number
+  summary?: string
   error_type?: string
   error_message?: string
 }
@@ -157,6 +158,13 @@ function App() {
         role: 'system',
         text: `Learned ${factsSaved} ${factsLabel} from ${data.filename ?? file.name}.`,
       })
+      if (data.summary && data.summary.trim()) {
+        appendMessage({
+          id: `${Date.now()}-upload-summary`,
+          role: 'assistant',
+          text: data.summary.trim(),
+        })
+      }
     } catch (err) {
       console.error(err)
       setError('Could not reach backend to upload the document.')
