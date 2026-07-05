@@ -5,12 +5,17 @@ from __future__ import annotations
 import io
 
 from db.database import SessionLocal
+from db.persistence import save_message
 from memory.fact_extractor import _merge_facts, _parse_extraction_response
 from providers.claude_provider import ClaudeProvider
 
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
 MAX_FILE_BYTES = 15 * 1024 * 1024  # 15 MB
 MAX_CHARS_FOR_EXTRACTION = 20000  # keep the extraction prompt within a reasonable token budget
+
+# Uploads have no conversation_id of their own; recent-message lookups are global
+# (see db.persistence.get_recent_messages_from_db), so any fixed id surfaces here.
+DOCUMENT_UPLOAD_CONVERSATION_ID = "document-uploads"
 
 DOCUMENT_EXTRACTION_SYSTEM_PROMPT = """You are extracting useful, reusable facts from a document a user uploaded to an AI companion named Caelo, so Caelo can recall this information in future conversations.
 
@@ -77,6 +82,7 @@ def ingest_document(filename: str, data: bytes) -> dict:
         ]
     )
     facts = _parse_extraction_response(response)
+    facts = [{**f, "content": f"From {filename}: {f['content']}"} for f in facts]
 
     session = SessionLocal()
     try:
@@ -87,6 +93,12 @@ def ingest_document(filename: str, data: bytes) -> dict:
         raise
     finally:
         session.close()
+
+    save_message(
+        DOCUMENT_UPLOAD_CONVERSATION_ID,
+        "user",
+        f"[Uploaded document: {filename} — Caelo extracted {saved} facts from it into memory]",
+    )
 
     return {
         "filename": filename,

@@ -62,6 +62,31 @@ def save_exchange(
         session.close()
 
 
+def save_message(conversation_id: str, role: str, content: str, mode: str | None = None) -> None:
+    """Persist a single message to SQLite. Failures are logged, not raised."""
+    if not conversation_id:
+        return
+    session = SessionLocal()
+    try:
+        _get_or_create_conversation(session, conversation_id)
+        session.add(
+            Message(
+                conversation_id=conversation_id,
+                role=role,
+                content=content,
+                mode_used=mode,
+                created_at=datetime.utcnow(),
+            )
+        )
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        # Swallow — persistence failures should never break chat responses
+        print(f"[persistence] save_message failed: {e}")
+    finally:
+        session.close()
+
+
 def get_recent_messages_from_db(limit: int = 20) -> list[dict[str, str]]:
     """
     Return the most recent messages globally, in chronological order.
