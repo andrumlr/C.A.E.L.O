@@ -13,6 +13,7 @@ from core.mode_selector import select_mode
 from core.prompt_builder import build_chat_messages
 from db.persistence import save_exchange, get_recent_messages_from_db
 from memory.fact_extractor import maybe_extract_facts
+from memory.facts import get_active_facts, format_facts_for_prompt
 from memory.summary_generator import maybe_generate_summary, get_current_summary
 from memory.short_term_buffer import (
     append_exchange,
@@ -113,6 +114,9 @@ def run_chat(
     Pass the same ``conversation_id`` across turns to enable short-term continuity
     (rolling in-memory window). Omit it for stateless requests.
     """
+    if not memory_context.strip():
+        memory_context = format_facts_for_prompt(get_active_facts())
+
     inferred_mode = select_mode(user_message)
     previous_mode = get_last_mode(conversation_id)
     mode = _resolve_effective_mode(user_message, inferred_mode, previous_mode)
