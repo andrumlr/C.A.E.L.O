@@ -137,7 +137,7 @@ def _compact_system_policy(text: str) -> str:
         s = re.sub(r"\*\*(.*?)\*\*", r"\1", s)
         s = re.sub(r"^\*\s+", "", s)
         out_lines.append(s)
-    return "\n".join(out_lines).strip()[:2800]
+    return "\n".join(out_lines).strip()[:12000]
 
 
 def _compact_mode_guide(text: str) -> str:
