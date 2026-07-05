@@ -92,6 +92,8 @@ def ingest_document(filename: str, data: bytes) -> dict:
         ]
     )
     facts = _parse_extraction_response(response)
+    if not facts:
+        print(f"[document_service] no facts parsed from {filename!r}; raw response: {response[:500]!r}")
     facts = [{**f, "content": f"From {filename}: {f['content']}"} for f in facts]
 
     summary = provider.generate_messages(
