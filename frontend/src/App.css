@@ -79,6 +79,15 @@
   border: 1px solid #273049;
 }
 
+.bubble.system {
+  align-self: center;
+  background: transparent;
+  color: #8b94b5;
+  border: 1px dashed #2a3144;
+  font-size: 0.85rem;
+  max-width: 90%;
+}
+
 .mode-tag {
   display: inline-block;
   margin-top: 8px;
@@ -90,6 +99,21 @@
 .typing {
   color: #8b94b5;
   font-size: 0.9rem;
+}
+
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.upload-input {
+  display: none;
+}
+
+.upload-hint {
+  color: #6f7898;
+  font-size: 0.8rem;
 }
 
 .chat-form {

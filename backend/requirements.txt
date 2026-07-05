@@ -4,3 +4,6 @@ sqlalchemy
 python-dotenv
 openai
 anthropic
+python-multipart
+pypdf
+python-docx

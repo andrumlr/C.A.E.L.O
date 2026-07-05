@@ -4,7 +4,7 @@ import './App.css'
 
 type ChatMessage = {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   text: string
   mode?: string
 }
@@ -15,6 +15,16 @@ type ChatApiResponse = {
   error_type?: string
   error_message?: string
 }
+
+type DocumentUploadResponse = {
+  filename?: string
+  chars_extracted?: number
+  facts_saved?: number
+  error_type?: string
+  error_message?: string
+}
+
+const ACCEPTED_DOCUMENT_EXTENSIONS = '.txt,.md,.pdf,.docx'
 
 const STORAGE_KEY = 'caelo.conversation_id'
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
@@ -31,11 +41,13 @@ function App() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [conversationId, setConversationId] = useState<string>(() => {
     const existing = window.localStorage.getItem(STORAGE_KEY)
     return existing && existing.trim() ? existing : createConversationId()
   })
   const listEndRef = useRef<HTMLDivElement | null>(null)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const canSend = useMemo(() => input.trim().length > 0 && !loading, [input, loading])
 
@@ -100,6 +112,56 @@ function App() {
     }
   }
 
+  const handleFileSelected = async (event: FormEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file) return
+
+    setError('')
+    setUploading(true)
+    appendMessage({
+      id: `${Date.now()}-upload-user`,
+      role: 'user',
+      text: `Uploaded document: ${file.name}`,
+    })
+
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const apiResponse = await fetch(`${API_BASE}/documents/`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data: DocumentUploadResponse = await apiResponse.json()
+      if (!apiResponse.ok || data.error_message) {
+        const errorMessage =
+          data.error_message ?? `Upload failed with status ${apiResponse.status}`
+        setError(errorMessage)
+        appendMessage({
+          id: `${Date.now()}-upload-error`,
+          role: 'system',
+          text: `Couldn't process ${file.name}: ${errorMessage}`,
+        })
+        return
+      }
+
+      const factsSaved = data.facts_saved ?? 0
+      const factsLabel = factsSaved === 1 ? 'fact' : 'facts'
+      appendMessage({
+        id: `${Date.now()}-upload-result`,
+        role: 'system',
+        text: `Learned ${factsSaved} ${factsLabel} from ${data.filename ?? file.name}.`,
+      })
+    } catch (err) {
+      console.error(err)
+      setError('Could not reach backend to upload the document.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const handleNewConversation = () => {
     const newId = createConversationId()
     setConversationId(newId)
@@ -134,8 +196,29 @@ function App() {
           ))
         )}
         {loading ? <p className="typing">Caelo is thinking...</p> : null}
+        {uploading ? <p className="typing">Reading document...</p> : null}
         <div ref={listEndRef} />
       </section>
+
+      <div className="upload-row">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ACCEPTED_DOCUMENT_EXTENSIONS}
+          className="upload-input"
+          onChange={handleFileSelected}
+          disabled={uploading}
+        />
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={uploading}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {uploading ? 'Uploading...' : 'Upload document'}
+        </button>
+        <span className="upload-hint">.txt, .md, .pdf, .docx</span>
+      </div>
 
       <form onSubmit={handleSubmit} className="chat-form">
         <textarea

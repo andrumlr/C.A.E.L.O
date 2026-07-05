@@ -13,7 +13,7 @@ from providers.claude_provider import ClaudeProvider
 FACT_EXTRACTION_INTERVAL = 30
 
 # Allowed categories — extracted facts not in this list are discarded
-ALLOWED_CATEGORIES = {"identity", "family", "preferences", "projects", "context"}
+ALLOWED_CATEGORIES = {"identity", "family", "preferences", "projects", "context", "knowledge"}
 
 EXTRACTION_SYSTEM_PROMPT = """You are extracting structured facts about a user from conversation history. These facts will be stored in a memory database for an AI companion named Caelo.
 
