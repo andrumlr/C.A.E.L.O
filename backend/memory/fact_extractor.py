@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 
 from sqlalchemy import func
@@ -108,11 +109,17 @@ def _parse_extraction_response(text: str) -> list[dict]:
     if not text or not text.strip():
         return []
     cleaned = text.strip()
-    # Strip markdown code fences if Claude added them despite instructions
-    if cleaned.startswith("```"):
-        lines = cleaned.split("\n")
-        lines = [ln for ln in lines if not ln.strip().startswith("```")]
-        cleaned = "\n".join(lines).strip()
+    # Strip markdown code fences if Claude added them despite instructions — the fence
+    # may not be the very first thing if a short preamble sneaks in before it.
+    fence_match = re.search(r"```(?:json)?\s*(.*?)```", cleaned, re.DOTALL)
+    if fence_match:
+        cleaned = fence_match.group(1).strip()
+    elif not cleaned.startswith("["):
+        # No fences and the response doesn't start clean — fall back to the first
+        # top-level JSON array anywhere in the text (handles a stray sentence of prose).
+        bracket_match = re.search(r"\[.*\]", cleaned, re.DOTALL)
+        if bracket_match:
+            cleaned = bracket_match.group(0)
     try:
         data = json.loads(cleaned)
     except json.JSONDecodeError:
