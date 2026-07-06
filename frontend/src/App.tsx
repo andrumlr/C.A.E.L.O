@@ -39,10 +39,12 @@ type ConversationMessage = {
 }
 
 type DocumentRecord = {
+  id: number
   filename: string
   facts_saved: number
   summary: string | null
   uploaded_at: string | null
+  has_file: boolean
 }
 
 type Panel = 'none' | 'history' | 'documents'
@@ -280,6 +282,26 @@ function App() {
     setPanel('none')
   }
 
+  const openDocumentFile = async (id: number, filename: string) => {
+    setPanelError('')
+    try {
+      const res = await fetch(`${API_BASE}/documents/${id}/file`, { headers: AUTH_HEADERS })
+      if (!res.ok) throw new Error(`Request failed with status ${res.status}`)
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.target = '_blank'
+      link.rel = 'noopener'
+      link.download = filename
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error(err)
+      setPanelError(`Could not open ${filename}.`)
+    }
+  }
+
   return (
     <main className="chat-page">
       <header className="chat-header">
@@ -332,7 +354,18 @@ function App() {
             ) : (
               documents.map((d, idx) => (
                 <div key={`${d.filename}-${idx}`} className="list-item static">
-                  <span className="list-item-preview">{d.filename}</span>
+                  <div className="list-item-row">
+                    <span className="list-item-preview">{d.filename}</span>
+                    {d.has_file ? (
+                      <button
+                        type="button"
+                        className="ghost-button small"
+                        onClick={() => openDocumentFile(d.id, d.filename)}
+                      >
+                        Open
+                      </button>
+                    ) : null}
+                  </div>
                   <span className="list-item-meta">
                     {d.facts_saved} {d.facts_saved === 1 ? 'fact' : 'facts'} · {formatDate(d.uploaded_at)}
                   </span>

@@ -53,3 +53,6 @@ class Document(Base):
     facts_saved = Column(Integer, default=0)
     summary = Column(Text)
     uploaded_at = Column(DateTime, default=datetime.utcnow)
+    file_path = Column(String, nullable=True)
+    content_type = Column(String, nullable=True)
+    size_bytes = Column(Integer, nullable=True)

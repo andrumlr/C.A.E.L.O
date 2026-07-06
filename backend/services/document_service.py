@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import io
+import mimetypes
+import uuid
 
-from db.database import SessionLocal
+from db.database import SessionLocal, get_data_dir
 from db.models import Document
 from db.persistence import save_message
 from memory.fact_extractor import _merge_facts, _parse_extraction_response
@@ -80,9 +82,21 @@ def extract_text(filename: str, data: bytes) -> str:
     return text
 
 
+def _save_upload_to_disk(filename: str, data: bytes) -> tuple[str, str, int]:
+    """Write the raw upload to disk under a generated name. Returns (file_path, content_type, size_bytes)."""
+    uploads_dir = get_data_dir() / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
+    file_path = uploads_dir / f"{uuid.uuid4().hex}{ext}"
+    file_path.write_bytes(data)
+    content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+    return str(file_path), content_type, len(data)
+
+
 def ingest_document(filename: str, data: bytes) -> dict:
     """Extract text from an uploaded document and store distilled facts in long-term memory."""
     text = extract_text(filename, data)
+    file_path, content_type, size_bytes = _save_upload_to_disk(filename, data)
     excerpt = text[:MAX_CHARS_FOR_EXTRACTION]
 
     provider = ClaudeProvider()
@@ -113,7 +127,16 @@ def ingest_document(filename: str, data: bytes) -> dict:
     session = SessionLocal()
     try:
         saved = _merge_facts(session, facts) if facts else 0
-        session.add(Document(filename=filename, facts_saved=saved, summary=summary))
+        session.add(
+            Document(
+                filename=filename,
+                facts_saved=saved,
+                summary=summary,
+                file_path=file_path,
+                content_type=content_type,
+                size_bytes=size_bytes,
+            )
+        )
         session.commit()
     except Exception:
         session.rollback()
@@ -147,15 +170,36 @@ def list_documents(limit: int = 100) -> list[dict]:
         )
         return [
             {
+                "id": d.id,
                 "filename": d.filename,
                 "facts_saved": d.facts_saved,
                 "summary": d.summary,
                 "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
+                "has_file": bool(d.file_path),
             }
             for d in rows
         ]
     except Exception as e:
         print(f"[document_service] list_documents failed: {e}")
         return []
+    finally:
+        session.close()
+
+
+def get_document_file(document_id: int) -> dict | None:
+    """Return stored-file info for a single document, or None if missing/never had a file on disk."""
+    session = SessionLocal()
+    try:
+        d = session.query(Document).filter_by(id=document_id).first()
+        if not d or not d.file_path:
+            return None
+        return {
+            "filename": d.filename,
+            "file_path": d.file_path,
+            "content_type": d.content_type,
+        }
+    except Exception as e:
+        print(f"[document_service] get_document_file failed: {e}")
+        return None
     finally:
         session.close()

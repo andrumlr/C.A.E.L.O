@@ -1,6 +1,14 @@
-from fastapi import APIRouter, UploadFile
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 from core.errors import safe_error_response
-from services.document_service import MAX_FILE_BYTES, ingest_document, list_documents
+from services.document_service import (
+    MAX_FILE_BYTES,
+    get_document_file,
+    ingest_document,
+    list_documents,
+)
 
 router = APIRouter()
 
@@ -8,6 +16,21 @@ router = APIRouter()
 @router.get("/")
 def get_documents():
     return list_documents()
+
+
+@router.get("/{document_id}/file")
+def download_document(document_id: int):
+    doc = get_document_file(document_id)
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+    file_path = Path(doc["file_path"])
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Document not found.")
+    return FileResponse(
+        path=file_path,
+        media_type=doc["content_type"] or "application/octet-stream",
+        filename=doc["filename"],
+    )
 
 
 @router.post("/")

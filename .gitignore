@@ -21,6 +21,7 @@ dist-ssr/
 
 # Local data
 *.db
+uploads/
 
 # Logs and OS
 logs/
