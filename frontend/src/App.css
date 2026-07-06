@@ -169,6 +169,42 @@
   line-height: 1.4;
 }
 
+.create-doc-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border: 1px solid #2a3144;
+  background: #0f1420;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.create-doc-title,
+.create-doc-instructions {
+  border: 1px solid #2a3144;
+  background: #0b0f18;
+  color: #eef3ff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font: inherit;
+}
+
+.create-doc-instructions {
+  resize: vertical;
+}
+
+.create-doc-title:focus,
+.create-doc-instructions:focus {
+  outline: 2px solid #5a6ca8;
+  outline-offset: 1px;
+}
+
+.create-doc-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .mode-tag {
   display: inline-block;
   margin-top: 8px;

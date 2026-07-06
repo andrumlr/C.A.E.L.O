@@ -90,6 +90,10 @@ function App() {
   const [panelError, setPanelError] = useState('')
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
+  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [createTitle, setCreateTitle] = useState('')
+  const [createInstructions, setCreateInstructions] = useState('')
+  const [creating, setCreating] = useState(false)
   const listEndRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -230,19 +234,56 @@ function App() {
     }
   }
 
+  const refreshDocuments = async () => {
+    const res = await fetch(`${API_BASE}/documents/`, { headers: AUTH_HEADERS })
+    if (!res.ok) throw new Error(`Request failed with status ${res.status}`)
+    setDocuments(await res.json())
+  }
+
   const openDocuments = async () => {
     setPanel('documents')
     setPanelError('')
+    setShowCreateForm(false)
     setPanelLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/documents/`, { headers: AUTH_HEADERS })
-      if (!res.ok) throw new Error(`Request failed with status ${res.status}`)
-      setDocuments(await res.json())
+      await refreshDocuments()
     } catch (err) {
       console.error(err)
       setPanelError('Could not load uploaded documents.')
     } finally {
       setPanelLoading(false)
+    }
+  }
+
+  const handleCreateDocument = async () => {
+    const title = createTitle.trim()
+    const instructions = createInstructions.trim()
+    if (!title || !instructions) {
+      setPanelError('Give the document a title and some instructions.')
+      return
+    }
+    setPanelError('')
+    setCreating(true)
+    try {
+      const res = await fetch(`${API_BASE}/documents/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...AUTH_HEADERS },
+        body: JSON.stringify({ title, instructions }),
+      })
+      const data: DocumentRecord & { error_message?: string } = await res.json()
+      if (!res.ok || data.error_message) {
+        setPanelError(data.error_message ?? `Request failed with status ${res.status}`)
+        return
+      }
+      setCreateTitle('')
+      setCreateInstructions('')
+      setShowCreateForm(false)
+      await refreshDocuments()
+    } catch (err) {
+      console.error(err)
+      setPanelError('Could not create the document.')
+    } finally {
+      setCreating(false)
     }
   }
 
@@ -348,31 +389,80 @@ function App() {
                 </button>
               ))
             ))}
-          {panel === 'documents' &&
-            (documents.length === 0 && !panelLoading ? (
-              <p className="empty-state">No documents uploaded yet.</p>
-            ) : (
-              documents.map((d, idx) => (
-                <div key={`${d.filename}-${idx}`} className="list-item static">
-                  <div className="list-item-row">
-                    <span className="list-item-preview">{d.filename}</span>
-                    {d.has_file ? (
-                      <button
-                        type="button"
-                        className="ghost-button small"
-                        onClick={() => openDocumentFile(d.id, d.filename)}
-                      >
-                        Open
-                      </button>
-                    ) : null}
+          {panel === 'documents' ? (
+            <>
+              {showCreateForm ? (
+                <div className="create-doc-form">
+                  <input
+                    type="text"
+                    className="create-doc-title"
+                    placeholder="Document title"
+                    value={createTitle}
+                    onChange={(e) => setCreateTitle(e.target.value)}
+                    disabled={creating}
+                  />
+                  <textarea
+                    className="create-doc-instructions"
+                    placeholder="What should Caelo write?"
+                    value={createInstructions}
+                    onChange={(e) => setCreateInstructions(e.target.value)}
+                    disabled={creating}
+                    rows={3}
+                  />
+                  <div className="create-doc-actions">
+                    <button
+                      type="button"
+                      className="ghost-button small"
+                      onClick={() => setShowCreateForm(false)}
+                      disabled={creating}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="ghost-button small"
+                      onClick={handleCreateDocument}
+                      disabled={creating}
+                    >
+                      {creating ? 'Writing...' : 'Create'}
+                    </button>
                   </div>
-                  <span className="list-item-meta">
-                    {d.facts_saved} {d.facts_saved === 1 ? 'fact' : 'facts'} · {formatDate(d.uploaded_at)}
-                  </span>
-                  {d.summary ? <p className="list-item-summary">{d.summary}</p> : null}
                 </div>
-              ))
-            ))}
+              ) : (
+                <button
+                  type="button"
+                  className="ghost-button"
+                  onClick={() => setShowCreateForm(true)}
+                >
+                  Create document
+                </button>
+              )}
+              {documents.length === 0 && !panelLoading ? (
+                <p className="empty-state">No documents yet.</p>
+              ) : (
+                documents.map((d, idx) => (
+                  <div key={`${d.filename}-${idx}`} className="list-item static">
+                    <div className="list-item-row">
+                      <span className="list-item-preview">{d.filename}</span>
+                      {d.has_file ? (
+                        <button
+                          type="button"
+                          className="ghost-button small"
+                          onClick={() => openDocumentFile(d.id, d.filename)}
+                        >
+                          Open
+                        </button>
+                      ) : null}
+                    </div>
+                    <span className="list-item-meta">
+                      {d.facts_saved} {d.facts_saved === 1 ? 'fact' : 'facts'} · {formatDate(d.uploaded_at)}
+                    </span>
+                    {d.summary ? <p className="list-item-summary">{d.summary}</p> : null}
+                  </div>
+                ))
+              )}
+            </>
+          ) : null}
         </section>
       ) : (
         <>

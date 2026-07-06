@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import mimetypes
+import re
 import uuid
 
 from db.database import SessionLocal, get_data_dir
@@ -44,6 +45,14 @@ Rules:
 - Plain prose only — no markdown, no bullet points, no headers
 - Be concrete: names, numbers, specifics beat vague generalities
 - If the document is thin or mostly boilerplate, say so plainly instead of padding"""
+
+DOCUMENT_CREATION_SYSTEM_PROMPT = """You are Caelo, writing a document a user asked you to create. Produce the document itself — the actual finished content, ready to save and read — not a description of it or notes about writing it.
+
+Rules:
+- Output ONLY the document content. No preamble like "Here is the document" and no closing commentary.
+- Write in plain text / Markdown. Use Markdown headings and lists only where they genuinely help the document's structure.
+- Where the document calls for voice or opinion, it's yours — direct, warm, no corporate filler. Where it's purely factual or practical, just write it cleanly.
+- Actually fulfill the request; don't hedge or leave placeholders unless the user explicitly asked for a template."""
 
 
 class UnsupportedFileType(ValueError):
@@ -184,6 +193,72 @@ def list_documents(limit: int = 100) -> list[dict]:
         return []
     finally:
         session.close()
+
+
+def _sanitize_display_filename(title: str) -> str:
+    """Turn a free-text title into a safe .md display filename."""
+    base = re.sub(r"[^\w\- ]+", "", title).strip() or "document"
+    if not base.lower().endswith(".md"):
+        base = f"{base}.md"
+    return base
+
+
+def _first_sentences(text: str, count: int = 2) -> str:
+    """Cheap summary: the first `count` sentences of body text, skipping Markdown headings."""
+    body_lines = [ln.strip() for ln in text.splitlines() if ln.strip() and not ln.lstrip().startswith("#")]
+    body = " ".join(body_lines)
+    if not body:
+        return ""
+    sentences = re.split(r"(?<=[.!?])\s+", body)
+    return " ".join(sentences[:count]).strip()
+
+
+def create_document(title: str, instructions: str) -> dict:
+    """Have Caelo write a document from a prompt and save it as a real file, like an upload."""
+    provider = ClaudeProvider()
+    content = provider.generate_messages(
+        [
+            {"role": "system", "content": DOCUMENT_CREATION_SYSTEM_PROMPT},
+            {"role": "user", "content": f"Title: {title}\n\nWhat to write:\n{instructions}"},
+        ]
+    ).strip()
+
+    filename = _sanitize_display_filename(title)
+    data = content.encode("utf-8")
+
+    uploads_dir = get_data_dir() / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    disk_path = uploads_dir / f"{uuid.uuid4().hex}.md"
+    disk_path.write_bytes(data)
+
+    summary = _first_sentences(content)
+
+    session = SessionLocal()
+    try:
+        doc = Document(
+            filename=filename,
+            facts_saved=0,
+            summary=summary,
+            file_path=str(disk_path),
+            content_type="text/markdown",
+            size_bytes=len(data),
+        )
+        session.add(doc)
+        session.commit()
+        result = {
+            "id": doc.id,
+            "filename": doc.filename,
+            "summary": doc.summary,
+            "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+            "has_file": True,
+        }
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+    return result
 
 
 def get_document_file(document_id: int) -> dict | None:

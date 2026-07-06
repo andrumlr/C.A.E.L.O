@@ -20,6 +20,7 @@ _WINDOW_SECONDS = 60
 _LIMITS: dict[tuple[str, str], int] = {
     ("POST", "/chat/"): 20,
     ("POST", "/documents/"): 6,
+    ("POST", "/documents/create"): 6,
 }
 
 _lock = Lock()

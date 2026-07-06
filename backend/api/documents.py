@@ -2,9 +2,11 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 from core.errors import safe_error_response
 from services.document_service import (
     MAX_FILE_BYTES,
+    create_document,
     get_document_file,
     ingest_document,
     list_documents,
@@ -13,9 +15,29 @@ from services.document_service import (
 router = APIRouter()
 
 
+class CreateDocumentRequest(BaseModel):
+    title: str = ""
+    instructions: str = ""
+
+
 @router.get("/")
 def get_documents():
     return list_documents()
+
+
+@router.post("/create")
+def create_document_route(payload: CreateDocumentRequest):
+    try:
+        title = payload.title.strip()
+        instructions = payload.instructions.strip()
+        if not title or not instructions:
+            return {
+                "error_type": "ValueError",
+                "error_message": "Both title and instructions are required.",
+            }
+        return create_document(title, instructions)
+    except Exception as e:
+        return safe_error_response(e, log_prefix="documents")
 
 
 @router.get("/{document_id}/file")
