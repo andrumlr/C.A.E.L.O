@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from core.config import Settings
-from providers.ollama_provider import _scrub_echoed_prompt_artifacts
 
 from anthropic import (
     Anthropic,
@@ -95,7 +94,7 @@ def _anthropic_messages(
     text = _message_text_content(response)
     if not text:
         raise RuntimeError("Anthropic returned an empty assistant message.")
-    return _scrub_echoed_prompt_artifacts(text)
+    return text
 
 
 class ClaudeProvider:
