@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import './App.css'
 
 type ChatMessage = {
@@ -75,6 +75,49 @@ function createConversationId(): string {
   return `caelo-${Date.now()}-${Math.random().toString(16).slice(2)}`
 }
 
+const svgProps = {
+  viewBox: '0 0 24 24',
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.8,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
+}
+
+const IconNewChat = () => (
+  <svg {...svgProps}>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+)
+const IconHistory = () => (
+  <svg {...svgProps}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </svg>
+)
+const IconDocuments = () => (
+  <svg {...svgProps}>
+    <path d="M8 3h6l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
+    <path d="M14 3v5h4" />
+  </svg>
+)
+const IconUpload = () => (
+  <svg {...svgProps}>
+    <path d="M12 15V4" />
+    <path d="m7 9 5-5 5 5" />
+    <path d="M5 15v3a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3" />
+  </svg>
+)
+const IconCreate = () => (
+  <svg {...svgProps}>
+    <path d="M12 3.5 13.6 8 18 9.6 13.6 11.2 12 15.6 10.4 11.2 6 9.6 10.4 8 12 3.5Z" />
+    <path d="M18 14.5 18.9 17 21.5 17.9 18.9 18.8 18 21.3 17.1 18.8 14.5 17.9 17.1 17 18 14.5Z" />
+  </svg>
+)
+
+type MenuItem = { key: string; label: string; icon: ReactNode; action: () => void }
+
 function App() {
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -94,6 +137,7 @@ function App() {
   const [createTitle, setCreateTitle] = useState('')
   const [createInstructions, setCreateInstructions] = useState('')
   const [creating, setCreating] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const listEndRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
@@ -165,6 +209,7 @@ function App() {
     event.currentTarget.value = ''
     if (!file) return
 
+    setPanel('none')
     setError('')
     setUploading(true)
     appendMessage({
@@ -255,6 +300,11 @@ function App() {
     }
   }
 
+  const openCreate = async () => {
+    await openDocuments()
+    setShowCreateForm(true)
+  }
+
   const handleCreateDocument = async () => {
     const title = createTitle.trim()
     const instructions = createInstructions.trim()
@@ -343,132 +393,40 @@ function App() {
     }
   }
 
-  return (
-    <main className="chat-page">
-      <header className="chat-header">
-        <div>
-          <h1>Caelo</h1>
-          <p className="chat-subtitle">Local conversation</p>
-        </div>
-        <div className="header-actions">
-          <button type="button" className="ghost-button" onClick={openHistory}>
-            History
-          </button>
-          <button type="button" className="ghost-button" onClick={openDocuments}>
-            Documents
-          </button>
-          <button type="button" className="ghost-button" onClick={handleNewConversation}>
-            New chat
-          </button>
-        </div>
-      </header>
+  // The bubble menu. Add new entries here as features land — the layout adapts.
+  const menuItems: MenuItem[] = [
+    { key: 'new', label: 'New Chat', icon: <IconNewChat />, action: handleNewConversation },
+    { key: 'history', label: 'History', icon: <IconHistory />, action: openHistory },
+    { key: 'documents', label: 'Documents', icon: <IconDocuments />, action: openDocuments },
+    { key: 'upload', label: 'Upload', icon: <IconUpload />, action: () => fileInputRef.current?.click() },
+    { key: 'create', label: 'Create', icon: <IconCreate />, action: openCreate },
+  ]
 
-      {panel !== 'none' ? (
-        <section className="chat-thread panel">
-          <div className="panel-header">
-            <h2>{panel === 'history' ? 'Previous chats' : 'Uploaded documents'}</h2>
-            <button type="button" className="ghost-button" onClick={() => setPanel('none')}>
-              Back to chat
-            </button>
-          </div>
-          {panelLoading ? <p className="typing">Loading...</p> : null}
-          {panelError ? <p className="error">{panelError}</p> : null}
-          {panel === 'history' &&
-            (conversations.length === 0 && !panelLoading ? (
-              <p className="empty-state">No past chats yet.</p>
-            ) : (
-              conversations.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className="list-item"
-                  onClick={() => loadConversation(c.id)}
-                >
-                  <span className="list-item-preview">{c.preview || '(empty)'}</span>
-                  <span className="list-item-meta">{formatDate(c.created_at)}</span>
-                </button>
-              ))
-            ))}
-          {panel === 'documents' ? (
-            <>
-              {showCreateForm ? (
-                <div className="create-doc-form">
-                  <input
-                    type="text"
-                    className="create-doc-title"
-                    placeholder="Document title"
-                    value={createTitle}
-                    onChange={(e) => setCreateTitle(e.target.value)}
-                    disabled={creating}
-                  />
-                  <textarea
-                    className="create-doc-instructions"
-                    placeholder="What should Caelo write?"
-                    value={createInstructions}
-                    onChange={(e) => setCreateInstructions(e.target.value)}
-                    disabled={creating}
-                    rows={3}
-                  />
-                  <div className="create-doc-actions">
-                    <button
-                      type="button"
-                      className="ghost-button small"
-                      onClick={() => setShowCreateForm(false)}
-                      disabled={creating}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      className="ghost-button small"
-                      onClick={handleCreateDocument}
-                      disabled={creating}
-                    >
-                      {creating ? 'Writing...' : 'Create'}
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="ghost-button"
-                  onClick={() => setShowCreateForm(true)}
-                >
-                  Create document
-                </button>
-              )}
-              {documents.length === 0 && !panelLoading ? (
-                <p className="empty-state">No documents yet.</p>
-              ) : (
-                documents.map((d, idx) => (
-                  <div key={`${d.filename}-${idx}`} className="list-item static">
-                    <div className="list-item-row">
-                      <span className="list-item-preview">{d.filename}</span>
-                      {d.has_file ? (
-                        <button
-                          type="button"
-                          className="ghost-button small"
-                          onClick={() => openDocumentFile(d.id, d.filename)}
-                        >
-                          Open
-                        </button>
-                      ) : null}
-                    </div>
-                    <span className="list-item-meta">
-                      {d.facts_saved} {d.facts_saved === 1 ? 'fact' : 'facts'} · {formatDate(d.uploaded_at)}
-                    </span>
-                    {d.summary ? <p className="list-item-summary">{d.summary}</p> : null}
-                  </div>
-                ))
-              )}
-            </>
-          ) : null}
-        </section>
-      ) : (
-        <>
+  const runMenuAction = (action: () => void) => {
+    setMenuOpen(false)
+    action()
+  }
+
+  return (
+    <main className="app-shell">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={ACCEPTED_DOCUMENT_EXTENSIONS}
+        className="upload-input"
+        onChange={handleFileSelected}
+        disabled={uploading}
+      />
+
+      {panel === 'none' ? (
+        <div className="screen chat-screen">
+          <header className="app-topbar">
+            <h1 className="brand">Caelo</h1>
+          </header>
+
           <section className="chat-thread" aria-live="polite">
             {messages.length === 0 ? (
-              <p className="empty-state">Start a conversation.</p>
+              <p className="empty-state">What's on your mind?</p>
             ) : (
               messages.map((msg) => (
                 <article key={msg.id} className={`bubble ${msg.role}`}>
@@ -484,45 +442,161 @@ function App() {
             <div ref={listEndRef} />
           </section>
 
-          <div className="upload-row">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={ACCEPTED_DOCUMENT_EXTENSIONS}
-              className="upload-input"
-              onChange={handleFileSelected}
-              disabled={uploading}
-            />
-            <button
-              type="button"
-              className="ghost-button"
-              disabled={uploading}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {uploading ? 'Uploading...' : 'Upload document'}
-            </button>
-            <span className="upload-hint">.txt, .md, .pdf, .docx</span>
-          </div>
-
-          <form onSubmit={handleSubmit} className="chat-form">
+          <form onSubmit={handleSubmit} className="composer">
             <textarea
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Type your message..."
+              placeholder="Message Caelo..."
               disabled={loading}
-              rows={2}
+              rows={1}
             />
-            <button type="submit" disabled={!canSend}>
-              {loading ? 'Sending...' : 'Send'}
+            <button type="submit" className="send-btn" disabled={!canSend} aria-label="Send">
+              <svg {...svgProps}>
+                <path d="M5 12h14" />
+                <path d="m13 6 6 6-6 6" />
+              </svg>
             </button>
           </form>
-        </>
+        </div>
+      ) : (
+        <div className="screen panel-screen">
+          <div className="panel-header">
+            <h2>{panel === 'history' ? 'Previous chats' : 'Documents'}</h2>
+            <button type="button" className="ghost-button" onClick={() => setPanel('none')}>
+              Back
+            </button>
+          </div>
+          <div className="panel-body">
+            {panelLoading ? <p className="typing">Loading...</p> : null}
+            {panelError ? <p className="error">{panelError}</p> : null}
+            {panel === 'history' &&
+              (conversations.length === 0 && !panelLoading ? (
+                <p className="empty-state">No past chats yet.</p>
+              ) : (
+                conversations.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="list-item"
+                    onClick={() => loadConversation(c.id)}
+                  >
+                    <span className="list-item-preview">{c.preview || '(empty)'}</span>
+                    <span className="list-item-meta">{formatDate(c.created_at)}</span>
+                  </button>
+                ))
+              ))}
+            {panel === 'documents' ? (
+              <>
+                {showCreateForm ? (
+                  <div className="create-doc-form">
+                    <input
+                      type="text"
+                      className="create-doc-title"
+                      placeholder="Document title"
+                      value={createTitle}
+                      onChange={(e) => setCreateTitle(e.target.value)}
+                      disabled={creating}
+                    />
+                    <textarea
+                      className="create-doc-instructions"
+                      placeholder="What should Caelo write?"
+                      value={createInstructions}
+                      onChange={(e) => setCreateInstructions(e.target.value)}
+                      disabled={creating}
+                      rows={3}
+                    />
+                    <div className="create-doc-actions">
+                      <button
+                        type="button"
+                        className="ghost-button small"
+                        onClick={() => setShowCreateForm(false)}
+                        disabled={creating}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="accent-button small"
+                        onClick={handleCreateDocument}
+                        disabled={creating}
+                      >
+                        {creating ? 'Writing...' : 'Create'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="accent-button block"
+                    onClick={() => setShowCreateForm(true)}
+                  >
+                    Create document
+                  </button>
+                )}
+                {documents.length === 0 && !panelLoading ? (
+                  <p className="empty-state">No documents yet.</p>
+                ) : (
+                  documents.map((d, idx) => (
+                    <div key={`${d.filename}-${idx}`} className="list-item static">
+                      <div className="list-item-row">
+                        <span className="list-item-preview">{d.filename}</span>
+                        {d.has_file ? (
+                          <button
+                            type="button"
+                            className="ghost-button small"
+                            onClick={() => openDocumentFile(d.id, d.filename)}
+                          >
+                            Open
+                          </button>
+                        ) : null}
+                      </div>
+                      <span className="list-item-meta">
+                        {d.facts_saved} {d.facts_saved === 1 ? 'fact' : 'facts'} · {formatDate(d.uploaded_at)}
+                      </span>
+                      {d.summary ? <p className="list-item-summary">{d.summary}</p> : null}
+                    </div>
+                  ))
+                )}
+              </>
+            ) : null}
+          </div>
+        </div>
       )}
 
-      <footer className="chat-footer">
-        <span className="conversation-id">conversation_id: {conversationId}</span>
-        {error ? <p className="error">Error: {error}</p> : null}
-      </footer>
+      {error ? <div className="toast">{error}</div> : null}
+
+      {menuOpen ? (
+        <div className="menu-overlay" onClick={() => setMenuOpen(false)}>
+          <div className="menu-grid" onClick={(e) => e.stopPropagation()}>
+            {menuItems.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                className="menu-item"
+                onClick={() => runMenuAction(item.action)}
+              >
+                <span className="menu-icon">{item.icon}</span>
+                <span className="menu-label">{item.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      <button
+        type="button"
+        className={`fab ${menuOpen ? 'open' : ''}`}
+        onClick={() => setMenuOpen((o) => !o)}
+        aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+      >
+        <span className="fab-orb" />
+        <span className="fab-x">
+          <svg {...svgProps}>
+            <path d="M6 6l12 12" />
+            <path d="M18 6 6 18" />
+          </svg>
+        </span>
+      </button>
     </main>
   )
 }

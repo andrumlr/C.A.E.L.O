@@ -1,7 +1,7 @@
 :root {
   font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
-  color: #d7ddef;
-  background: #0b0f18;
+  color: #f2ece6;
+  background: #0a0706;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -20,7 +20,11 @@ body,
 }
 
 body {
-  background: radial-gradient(1200px 600px at 20% -10%, #1b2233 0%, #0b0f18 60%);
+  background:
+    radial-gradient(1100px 700px at 85% -5%, #2a1a12 0%, rgba(42, 26, 18, 0) 55%),
+    radial-gradient(900px 600px at 10% 5%, #1d130f 0%, rgba(29, 19, 15, 0) 50%),
+    linear-gradient(165deg, #140d0a 0%, #0b0706 55%, #070505 100%);
+  background-attachment: fixed;
 }
 
 p {
