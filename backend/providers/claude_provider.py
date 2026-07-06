@@ -62,7 +62,7 @@ def _anthropic_messages(
     try:
         kwargs: dict[str, object] = {
             "model": model,
-            "max_tokens": 1024,
+            "max_tokens": 4096,
             "messages": api_messages,
         }
         if system:
