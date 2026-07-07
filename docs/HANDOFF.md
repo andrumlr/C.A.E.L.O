@@ -201,16 +201,23 @@ Selected by `CAELO_PROVIDER`. **`max_tokens` is 4096** in `claude_provider.py`
      id, so auto-loading the last `conversationId` on mount is a small wire-up.
 5. ✅ GUI redesign — **done, live** (mobile-first warm theme + bubble menu).
 
-**Also queued — Personality overhaul (high daily impact):** responses still run
-long and question-heavy in normal chat, not warm/companion-like enough. Goal:
-shorter, fewer questions, no "how can I help", warmer, grows via memory. Files:
-`personality/*.txt`, `prompts/SYSTEM_PROMPT.md.txt`,
-`prompts/MODE_PROMPTS.md.txt`, `backend/core/prompt_builder.py`.
+**✅ Personality overhaul (Personality v2) — done, merged (PR #3).** The active
+persona files `prompts/SYSTEM_PROMPT.md.txt` and `prompts/MODE_PROMPTS.md.txt`
+were rebuilt: tighter, less question-heavy (default to no question, lead with
+the answer, match the weight of the moment), no customer-support phrasing, and
+it forbids invented familiarity (familiarity must trace to real
+memory/uploaded context). `personality/*.txt` remain inactive reference material
+— they were **not** the live prompts and were left untouched. The change is
+gated by `backend/core/prompt_builder.py`'s compaction pipeline (system cap
+12000, per-mode cap 1200, `# ANALYSIS MODE`-style headers required); a
+verification script for this lives in the PR #3 description if the prompts are
+ever re-edited.
 
-**Recommended next:** the **personality overhaul** — with the feature roadmap
-(1–3, 5) essentially done, this is the highest felt-impact work left and what
-the owner notices every session. Otherwise the small **4b** wire-up
-(auto-restore last conversation on reopen) is a cheap, self-contained win.
+**Recommended next:** the small **4b** wire-up (auto-restore the last
+conversation on reopen) is a cheap, self-contained win — the History panel
+already fetches any conversation by id, so it's mostly loading the stored
+`conversationId` on mount. Beyond that, the freeze bug (4a) still needs a
+real on-screen repro before it can be fixed.
 
 ## 11. Open housekeeping
 
