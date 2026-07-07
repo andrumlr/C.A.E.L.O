@@ -10,6 +10,7 @@ from services.document_service import (
     get_document_file,
     ingest_document,
     list_documents,
+    save_image,
 )
 
 router = APIRouter()
@@ -65,5 +66,24 @@ async def upload_document(file: UploadFile):
                 "error_message": f"File is too large. Max size is {MAX_FILE_BYTES // (1024 * 1024)} MB.",
             }
         return ingest_document(file.filename or "upload", data)
+    except Exception as e:
+        return safe_error_response(e, log_prefix="documents")
+
+
+@router.post("/images")
+async def upload_image(file: UploadFile):
+    try:
+        if not (file.content_type or "").startswith("image/"):
+            return {
+                "error_type": "ValueError",
+                "error_message": "Only image files are allowed.",
+            }
+        data = await file.read()
+        if len(data) > MAX_FILE_BYTES:
+            return {
+                "error_type": "ValueError",
+                "error_message": f"File is too large. Max size is {MAX_FILE_BYTES // (1024 * 1024)} MB.",
+            }
+        return save_image(file.filename or "image", data)
     except Exception as e:
         return safe_error_response(e, log_prefix="documents")

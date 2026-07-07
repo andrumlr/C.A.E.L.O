@@ -43,13 +43,18 @@ type DocumentRecord = {
   filename: string
   facts_saved: number
   summary: string | null
+  content_type: string | null
   uploaded_at: string | null
   has_file: boolean
 }
 
-type Panel = 'none' | 'history' | 'documents'
+type Panel = 'none' | 'history' | 'documents' | 'images'
 
 const ACCEPTED_DOCUMENT_EXTENSIONS = '.txt,.md,.pdf,.docx'
+
+function isImage(d: DocumentRecord): boolean {
+  return (d.content_type ?? '').startsWith('image/')
+}
 
 function formatDate(iso: string | null | undefined): string {
   if (!iso) return ''
@@ -115,6 +120,35 @@ const IconCreate = () => (
     <path d="M18 14.5 18.9 17 21.5 17.9 18.9 18.8 18 21.3 17.1 18.8 14.5 17.9 17.1 17 18 14.5Z" />
   </svg>
 )
+const IconImages = () => (
+  <svg {...svgProps}>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <path d="m21 15-5-5L5 21" />
+  </svg>
+)
+
+// <img> can't send auth headers, so fetch the file as a blob and use an object URL.
+function AuthImage({ id, className, onClick }: { id: number; className?: string; onClick?: () => void }) {
+  const [src, setSrc] = useState('')
+  useEffect(() => {
+    let objectUrl = ''
+    let active = true
+    fetch(`${API_BASE}/documents/${id}/file`, { headers: AUTH_HEADERS })
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
+      .then((blob) => {
+        if (!active) return
+        objectUrl = URL.createObjectURL(blob)
+        setSrc(objectUrl)
+      })
+      .catch(() => {})
+    return () => {
+      active = false
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [id])
+  return <img src={src} className={className} onClick={onClick} alt="" />
+}
 
 type MenuItem = { key: string; label: string; icon: ReactNode; action: () => void }
 
@@ -138,8 +172,11 @@ function App() {
   const [createInstructions, setCreateInstructions] = useState('')
   const [creating, setCreating] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [imageUploading, setImageUploading] = useState(false)
+  const [viewerImageId, setViewerImageId] = useState<number | null>(null)
   const listEndRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const imageInputRef = useRef<HTMLInputElement | null>(null)
 
   const canSend = useMemo(() => input.trim().length > 0 && !loading, [input, loading])
 
@@ -305,6 +342,49 @@ function App() {
     setShowCreateForm(true)
   }
 
+  const openImages = async () => {
+    setPanel('images')
+    setPanelError('')
+    setPanelLoading(true)
+    try {
+      await refreshDocuments()
+    } catch (err) {
+      console.error(err)
+      setPanelError('Could not load images.')
+    } finally {
+      setPanelLoading(false)
+    }
+  }
+
+  const handleImageSelected = async (event: FormEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file) return
+
+    setPanelError('')
+    setImageUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const res = await fetch(`${API_BASE}/documents/images`, {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+        body: formData,
+      })
+      const data: DocumentRecord & { error_message?: string } = await res.json()
+      if (!res.ok || data.error_message) {
+        setPanelError(data.error_message ?? `Upload failed with status ${res.status}`)
+        return
+      }
+      await refreshDocuments()
+    } catch (err) {
+      console.error(err)
+      setPanelError('Could not upload the image.')
+    } finally {
+      setImageUploading(false)
+    }
+  }
+
   const handleCreateDocument = async () => {
     const title = createTitle.trim()
     const instructions = createInstructions.trim()
@@ -398,6 +478,7 @@ function App() {
     { key: 'new', label: 'New Chat', icon: <IconNewChat />, action: handleNewConversation },
     { key: 'history', label: 'History', icon: <IconHistory />, action: openHistory },
     { key: 'documents', label: 'Documents', icon: <IconDocuments />, action: openDocuments },
+    { key: 'images', label: 'Images', icon: <IconImages />, action: openImages },
     { key: 'upload', label: 'Upload', icon: <IconUpload />, action: () => fileInputRef.current?.click() },
     { key: 'create', label: 'Create', icon: <IconCreate />, action: openCreate },
   ]
@@ -416,6 +497,14 @@ function App() {
         className="upload-input"
         onChange={handleFileSelected}
         disabled={uploading}
+      />
+      <input
+        ref={imageInputRef}
+        type="file"
+        accept="image/*"
+        className="upload-input"
+        onChange={handleImageSelected}
+        disabled={imageUploading}
       />
 
       {panel === 'none' ? (
@@ -461,7 +550,7 @@ function App() {
       ) : (
         <div className="screen panel-screen">
           <div className="panel-header">
-            <h2>{panel === 'history' ? 'Previous chats' : 'Documents'}</h2>
+            <h2>{panel === 'history' ? 'Previous chats' : panel === 'images' ? 'Images' : 'Documents'}</h2>
             <button type="button" className="ghost-button" onClick={() => setPanel('none')}>
               Back
             </button>
@@ -533,35 +622,69 @@ function App() {
                     Create document
                   </button>
                 )}
-                {documents.length === 0 && !panelLoading ? (
+                {documents.filter((d) => !isImage(d)).length === 0 && !panelLoading ? (
                   <p className="empty-state">No documents yet.</p>
                 ) : (
-                  documents.map((d, idx) => (
-                    <div key={`${d.filename}-${idx}`} className="list-item static">
-                      <div className="list-item-row">
-                        <span className="list-item-preview">{d.filename}</span>
-                        {d.has_file ? (
-                          <button
-                            type="button"
-                            className="ghost-button small"
-                            onClick={() => openDocumentFile(d.id, d.filename)}
-                          >
-                            Open
-                          </button>
-                        ) : null}
+                  documents
+                    .filter((d) => !isImage(d))
+                    .map((d, idx) => (
+                      <div key={`${d.filename}-${idx}`} className="list-item static">
+                        <div className="list-item-row">
+                          <span className="list-item-preview">{d.filename}</span>
+                          {d.has_file ? (
+                            <button
+                              type="button"
+                              className="ghost-button small"
+                              onClick={() => openDocumentFile(d.id, d.filename)}
+                            >
+                              Open
+                            </button>
+                          ) : null}
+                        </div>
+                        <span className="list-item-meta">
+                          {d.facts_saved} {d.facts_saved === 1 ? 'fact' : 'facts'} · {formatDate(d.uploaded_at)}
+                        </span>
+                        {d.summary ? <p className="list-item-summary">{d.summary}</p> : null}
                       </div>
-                      <span className="list-item-meta">
-                        {d.facts_saved} {d.facts_saved === 1 ? 'fact' : 'facts'} · {formatDate(d.uploaded_at)}
-                      </span>
-                      {d.summary ? <p className="list-item-summary">{d.summary}</p> : null}
-                    </div>
-                  ))
+                    ))
+                )}
+              </>
+            ) : null}
+            {panel === 'images' ? (
+              <>
+                <button
+                  type="button"
+                  className="accent-button block"
+                  onClick={() => imageInputRef.current?.click()}
+                  disabled={imageUploading}
+                >
+                  {imageUploading ? 'Uploading...' : 'Upload image'}
+                </button>
+                {documents.filter(isImage).length === 0 && !panelLoading ? (
+                  <p className="empty-state">No images yet.</p>
+                ) : (
+                  <div className="image-grid">
+                    {documents.filter(isImage).map((d) => (
+                      <AuthImage
+                        key={d.id}
+                        id={d.id}
+                        className="image-thumb"
+                        onClick={() => setViewerImageId(d.id)}
+                      />
+                    ))}
+                  </div>
                 )}
               </>
             ) : null}
           </div>
         </div>
       )}
+
+      {viewerImageId !== null ? (
+        <div className="image-viewer" onClick={() => setViewerImageId(null)}>
+          <AuthImage id={viewerImageId} className="viewer-img" />
+        </div>
+      ) : null}
 
       {error ? <div className="toast">{error}</div> : null}
 

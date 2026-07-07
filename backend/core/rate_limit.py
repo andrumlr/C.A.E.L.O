@@ -21,6 +21,7 @@ _LIMITS: dict[tuple[str, str], int] = {
     ("POST", "/chat/"): 20,
     ("POST", "/documents/"): 6,
     ("POST", "/documents/create"): 6,
+    ("POST", "/documents/images"): 12,
 }
 
 _lock = Lock()

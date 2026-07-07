@@ -183,6 +183,7 @@ def list_documents(limit: int = 100) -> list[dict]:
                 "filename": d.filename,
                 "facts_saved": d.facts_saved,
                 "summary": d.summary,
+                "content_type": d.content_type,
                 "uploaded_at": d.uploaded_at.isoformat() if d.uploaded_at else None,
                 "has_file": bool(d.file_path),
             }
@@ -248,6 +249,39 @@ def create_document(title: str, instructions: str) -> dict:
         result = {
             "id": doc.id,
             "filename": doc.filename,
+            "summary": doc.summary,
+            "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+            "has_file": True,
+        }
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+    return result
+
+
+def save_image(filename: str, data: bytes) -> dict:
+    """Store an uploaded image as a file, with no text/fact extraction."""
+    file_path, content_type, size_bytes = _save_upload_to_disk(filename, data)
+
+    session = SessionLocal()
+    try:
+        doc = Document(
+            filename=filename,
+            facts_saved=0,
+            summary=None,
+            file_path=file_path,
+            content_type=content_type,
+            size_bytes=size_bytes,
+        )
+        session.add(doc)
+        session.commit()
+        result = {
+            "id": doc.id,
+            "filename": doc.filename,
+            "content_type": doc.content_type,
             "summary": doc.summary,
             "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
             "has_file": True,
