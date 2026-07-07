@@ -90,23 +90,34 @@ Frontend (baked at build): `VITE_API_BASE_URL`, `VITE_API_KEY`.
   saved as a real `.md` file (same storage as uploads).
 - **Documents panel**: lists uploaded + created docs with summary, fact count,
   date, and an **Open** button (downloads the original file; only shown when a
-  file exists on disk — pre-storage uploads have none).
+  file exists on disk — pre-storage uploads have none). **Excludes images.**
+- **Image upload + Images panel**: images are stored as plain files (same
+  `Document` row + `uploads/` dir + download route as documents) with **no text
+  or fact extraction**. The Images panel is a thumbnail grid with an upload
+  control and tap-to-enlarge full-screen viewer. Thumbnails/viewer fetch each
+  image as an **authed blob** (see lesson 5) rather than a bare `<img src>`.
 - **History panel**: browse past conversations and tap one to reload/resume it.
 - **Security**: shared-secret API gate, per-IP rate limiting, tightened CORS,
   sanitized error responses (see Security).
 - **GUI (redesigned, live)**: mobile-first warm-dark theme. Plain chat screen +
   a floating gradient orb (bottom-right). Tapping the orb dims/blurs and fans
-  out a bubble menu: **New Chat · History · Documents · Upload · Create**. The
-  menu is a single data-driven array in `frontend/src/App.tsx` (`menuItems`) —
-  **add new options there** (label + icon + action) and the layout adapts.
+  out a bubble menu: **New Chat · History · Documents · Images · Upload · Create
+  · Refresh**. `Refresh` hard-reloads the page (`window.location.reload`) — the
+  recovery path for the occasional frozen-UI state (roadmap 4a). The menu is a
+  single data-driven array in `frontend/src/App.tsx` (`menuItems`) — **add new
+  options there** (label + icon + action) and the layout adapts.
 
 ## 5. API surface (all require `X-API-Key` header when `CAELO_API_KEY` is set)
 
 - `POST /chat/` — send a message. Body `{message, conversation_id?}`.
-- `GET  /documents/` — list documents (incl. `id`, `has_file`).
-- `POST /documents/` — multipart upload.
+- `GET  /documents/` — list documents + images (incl. `id`, `content_type`,
+  `has_file`). The frontend splits documents vs images by `content_type`.
+- `POST /documents/` — multipart document upload (extraction + facts + summary).
+- `POST /documents/images` — multipart image upload (image/* only, stored raw,
+  no extraction).
 - `POST /documents/create` — body `{title, instructions}`; Caelo writes a doc.
-- `GET  /documents/{id}/file` — download original (404 if missing/no file).
+- `GET  /documents/{id}/file` — download original (404 if missing/no file);
+  serves both documents and images.
 - `GET  /conversations/` — list past chats (excludes the internal
   `document-uploads` bucket).
 - `GET  /conversations/{id}/messages` — full transcript.
@@ -120,7 +131,9 @@ Frontend (baked at build): `VITE_API_BASE_URL`, `VITE_API_KEY`.
   frontend build's `VITE_API_KEY` and the backend's `CAELO_API_KEY` don't match
   (often a stale frontend build).**
 - **Rate limiting** (`backend/core/rate_limit.py`, in-memory, per IP):
-  `POST /chat/` 20/min, `POST /documents/` and `POST /documents/create` 6/min.
+  `POST /chat/` 20/min, `POST /documents/` and `POST /documents/create` 6/min,
+  `POST /documents/images` 12/min. Keyed by `(method, path)` — GET/read
+  endpoints are unlimited.
 - **CORS**: `allow_credentials=False`, origin regex for `*.railway.app` + localhost.
 - **Errors**: unexpected exceptions are logged server-side and return a generic
   message; only deliberately-raised user-facing errors pass through
@@ -131,7 +144,10 @@ Frontend (baked at build): `VITE_API_BASE_URL`, `VITE_API_KEY`.
 Tables: `conversations`, `messages`, `memory_entries`, `settings`, `summaries`,
 `documents`. `documents` columns: id, filename (display name), facts_saved,
 summary, uploaded_at, file_path, content_type, size_bytes. Files live at
-`{CAELO_DATA_DIR}/uploads/<uuid>.<ext>`.
+`{CAELO_DATA_DIR}/uploads/<uuid>.<ext>`. **Images share the `documents` table**
+— an image is just a `Document` row with an `image/*` `content_type`,
+`facts_saved=0`, and `summary=NULL`; documents vs images are distinguished
+purely by `content_type`.
 
 ## 8. Providers
 
@@ -162,6 +178,10 @@ Selected by `CAELO_PROVIDER`. **`max_tokens` is 4096** in `claude_provider.py`
    extraction yields nothing — use it.
 4. **"It's not working" is often a half-deployed frontend or a cached build**,
    not a code bug. Check both services + hard-refresh before deep-diving.
+5. **`<img src>` can't send the `X-API-Key` header**, so behind the auth gate a
+   bare image tag 401s. Fetch the image as a blob with `AUTH_HEADERS` and use an
+   object URL instead (see the `AuthImage` component in `App.tsx`). Same reason
+   the document "Open" download fetches a blob rather than linking directly.
 
 ---
 
@@ -169,17 +189,17 @@ Selected by `CAELO_PROVIDER`. **`max_tokens` is 4096** in `claude_provider.py`
 
 1. ✅ Real file storage for uploads — **done, live-verified**.
 2. ✅ Caelo can create documents — **done, live-verified**.
-3. ⬜ **Image folder** — uploaded and Caelo-created images, separate view.
-   Reuse the proven upload/storage/download mechanism. Not started.
-4. ⬜ **New-chat / reopen behavior** — two distinct problems, split them:
-   - **4a (bug, unreproduced):** app sometimes freezes and needs a force-quit;
-     "New chat" doesn't recover. Never reproduced — **next time it happens,
-     capture what's on screen** (blank? frozen "thinking…" spinner? dead
-     buttons?). Can't fix blind.
-   - **4b (design gap):** on reopen, the chat starts blank — `messages`
+3. ✅ **Image folder** — Images panel + storage, separate from Documents.
+   **Done, pushed.** (Reused the document storage/download mechanism.)
+4. **New-chat / reopen behavior** — two distinct problems:
+   - **4a (freeze recovery): partially addressed.** A **Refresh** menu item now
+     hard-reloads the page, giving a recovery path without force-quitting. The
+     underlying freeze itself is still **unreproduced** — next time it happens,
+     capture what's on screen (blank? frozen "thinking…" spinner? dead buttons?).
+   - **4b (design gap, open):** on reopen the chat starts blank — `messages`
      initializes to `[]`. The History panel already fetches any conversation by
      id, so auto-loading the last `conversationId` on mount is a small wire-up.
-5. ✅ GUI redesign — **done, live** (was slated last; done now).
+5. ✅ GUI redesign — **done, live** (mobile-first warm theme + bubble menu).
 
 **Also queued — Personality overhaul (high daily impact):** responses still run
 long and question-heavy in normal chat, not warm/companion-like enough. Goal:
@@ -187,9 +207,10 @@ shorter, fewer questions, no "how can I help", warmer, grows via memory. Files:
 `personality/*.txt`, `prompts/SYSTEM_PROMPT.md.txt`,
 `prompts/MODE_PROMPTS.md.txt`, `backend/core/prompt_builder.py`.
 
-**Recommended next:** the personality overhaul (highest felt impact, and
-independent of the remaining feature work), or the image folder if staying in
-roadmap order (it reuses storage we've already proven works).
+**Recommended next:** the **personality overhaul** — with the feature roadmap
+(1–3, 5) essentially done, this is the highest felt-impact work left and what
+the owner notices every session. Otherwise the small **4b** wire-up
+(auto-restore last conversation on reopen) is a cheap, self-contained win.
 
 ## 11. Open housekeeping
 
