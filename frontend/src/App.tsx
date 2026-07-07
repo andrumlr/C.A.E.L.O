@@ -127,6 +127,12 @@ const IconImages = () => (
     <path d="m21 15-5-5L5 21" />
   </svg>
 )
+const IconRefresh = () => (
+  <svg {...svgProps}>
+    <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+    <path d="M21 3v5h-5" />
+  </svg>
+)
 
 // <img> can't send auth headers, so fetch the file as a blob and use an object URL.
 function AuthImage({ id, className, onClick }: { id: number; className?: string; onClick?: () => void }) {
@@ -481,6 +487,7 @@ function App() {
     { key: 'images', label: 'Images', icon: <IconImages />, action: openImages },
     { key: 'upload', label: 'Upload', icon: <IconUpload />, action: () => fileInputRef.current?.click() },
     { key: 'create', label: 'Create', icon: <IconCreate />, action: openCreate },
+    { key: 'refresh', label: 'Refresh', icon: <IconRefresh />, action: () => window.location.reload() },
   ]
 
   const runMenuAction = (action: () => void) => {
