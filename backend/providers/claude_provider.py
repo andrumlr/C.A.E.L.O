@@ -50,6 +50,7 @@ def _anthropic_messages(
     api_key: str,
     model: str,
     messages: list[dict[str, str]],
+    max_tokens: int = 4096,
 ) -> str:
     if not (api_key or "").strip():
         raise RuntimeError(
@@ -61,7 +62,7 @@ def _anthropic_messages(
     try:
         kwargs: dict[str, object] = {
             "model": model,
-            "max_tokens": 4096,
+            "max_tokens": max_tokens,
             "messages": api_messages,
         }
         if system:
@@ -105,9 +106,10 @@ class ClaudeProvider:
 
         self._settings = settings or get_settings()
 
-    def generate_messages(self, messages: list[dict[str, str]]) -> str:
+    def generate_messages(self, messages: list[dict[str, str]], max_tokens: int = 4096) -> str:
         return _anthropic_messages(
             api_key=self._settings.anthropic_api_key,
             model=self._settings.claude_model,
             messages=messages,
+            max_tokens=max_tokens,
         )
