@@ -267,5 +267,13 @@ def build_chat_messages(
 
     out: list[dict[str, str]] = [{"role": "system", "content": system_content}]
     out.extend(hist)
+    # When there's prior thread to mirror, re-anchor brevity closest to the live turn.
+    if hist:
+        out.append({
+            "role": "system",
+            "content": "Reminder: answer the message below directly and "
+                       "concisely. Match its weight. No unprompted lists or "
+                       "multi-section breakdowns unless explicitly asked.",
+        })
     out.append({"role": "user", "content": user_input.strip()})
     return out

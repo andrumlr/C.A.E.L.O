@@ -143,7 +143,7 @@ def run_chat(
         recent_messages=recent,
         summary_text=summary_text,
     )
-    text = _provider.generate_messages(messages)
+    text = _provider.generate_messages(messages, max_tokens=1024)
     # Never persist leaked/system-looking output into short-term history.
     if text and not looks_like_internal_echo(text):
         append_exchange(conversation_id, user_message, text)
