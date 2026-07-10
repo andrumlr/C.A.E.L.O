@@ -74,9 +74,14 @@ class OpenAIProvider:
 
         self._settings = settings or get_settings()
 
-    def generate_messages(self, messages: list[dict[str, str]], max_tokens: int = 4096) -> str:
-        # max_tokens accepted for interface parity with ClaudeProvider (the
-        # production provider); not applied to the OpenAI call here.
+    def generate_messages(
+        self,
+        messages: list[dict[str, str]],
+        max_tokens: int = 4096,
+        images: list[dict[str, str]] | None = None,
+    ) -> str:
+        # max_tokens and images accepted for interface parity with ClaudeProvider
+        # (the production provider); neither is applied to the OpenAI call here.
         return _openai_chat(
             api_key=self._settings.openai_api_key,
             model=self._settings.openai_model,

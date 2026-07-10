@@ -6,11 +6,12 @@ from pydantic import BaseModel
 from core.errors import safe_error_response
 from services.document_service import (
     MAX_FILE_BYTES,
+    MAX_IMAGE_BYTES,
     create_document,
     get_document_file,
     ingest_document,
+    ingest_image,
     list_documents,
-    save_image,
 )
 
 router = APIRouter()
@@ -79,11 +80,11 @@ async def upload_image(file: UploadFile):
                 "error_message": "Only image files are allowed.",
             }
         data = await file.read()
-        if len(data) > MAX_FILE_BYTES:
+        if len(data) > MAX_IMAGE_BYTES:
             return {
                 "error_type": "ValueError",
-                "error_message": f"File is too large. Max size is {MAX_FILE_BYTES // (1024 * 1024)} MB.",
+                "error_message": f"Image is too large. Max size is {MAX_IMAGE_BYTES // (1024 * 1024)} MB.",
             }
-        return save_image(file.filename or "image", data)
+        return ingest_image(file.filename or "image", data)
     except Exception as e:
         return safe_error_response(e, log_prefix="documents")
