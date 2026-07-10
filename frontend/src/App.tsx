@@ -874,7 +874,9 @@ function App() {
               <path d="M18 6 6 18" />
             </svg>
           </button>
-          <AuthImage id={viewerImageId} className="viewer-img" />
+          <div className="viewer-inner" onClick={(e) => e.stopPropagation()}>
+            <AuthImage id={viewerImageId} className="viewer-img" />
+          </div>
         </div>
       ) : null}
 
