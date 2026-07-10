@@ -74,9 +74,14 @@ class OllamaProvider:
 
         self._settings = settings or get_settings()
 
-    def generate_messages(self, messages: list[dict[str, str]], max_tokens: int = 4096) -> str:
-        # max_tokens accepted for interface parity with ClaudeProvider (the
-        # production provider); not applied to the Ollama call here.
+    def generate_messages(
+        self,
+        messages: list[dict[str, str]],
+        max_tokens: int = 4096,
+        images: list[dict[str, str]] | None = None,
+    ) -> str:
+        # max_tokens and images accepted for interface parity with ClaudeProvider
+        # (the production provider); neither is applied to the Ollama call here.
         return _ollama_chat(
             base_url=self._settings.ollama_base_url,
             model=self._settings.ollama_model,

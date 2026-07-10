@@ -24,6 +24,7 @@ from memory.short_term_buffer import (
 from providers.claude_provider import ClaudeProvider
 from providers.openai_provider import OpenAIProvider
 from providers.ollama_provider import OllamaProvider, looks_like_internal_echo
+from services.document_service import save_image
 
 
 def _build_provider() -> OllamaProvider | OpenAIProvider | ClaudeProvider:
@@ -106,6 +107,7 @@ def run_chat(
     memory_context: str = "",
     *,
     conversation_id: str | None = None,
+    image: dict | None = None,
 ) -> dict:
     """
     Returns a dict suitable for JSON from `/chat/`:
@@ -113,13 +115,22 @@ def run_chat(
 
     Pass the same ``conversation_id`` across turns to enable short-term continuity
     (rolling in-memory window). Omit it for stateless requests.
+
+    ``image`` (optional) is a dict with ``media_type``, ``data`` (base64),
+    ``bytes`` (decoded), and ``filename``. When present, Caelo reacts to it
+    conversationally (no forced fact extraction on this path); the image is
+    persisted so it also appears in the Images tab, and history stores a text
+    placeholder — never base64.
     """
     if not memory_context.strip():
         memory_context = format_facts_for_prompt(get_active_facts())
 
-    inferred_mode = select_mode(user_message)
+    # An image-only turn still needs a mode; treat the empty text as a light
+    # presence turn so mode selection has something to work with.
+    mode_input = user_message or "[shared an image]"
+    inferred_mode = select_mode(mode_input)
     previous_mode = get_last_mode(conversation_id)
-    mode = _resolve_effective_mode(user_message, inferred_mode, previous_mode)
+    mode = _resolve_effective_mode(mode_input, inferred_mode, previous_mode)
     db_recent = get_recent_messages_from_db(limit=20)
     if db_recent:
         recent_raw = db_recent
@@ -136,18 +147,42 @@ def run_chat(
         )
     ]
     summary_text = get_current_summary()
+
+    # Text the model actually sees for this turn. An image can arrive with no
+    # caption, so give the model a light nudge to react in-voice.
+    model_text = user_message
+    if image is not None and not model_text:
+        model_text = "(The user shared an image without a caption.)"
+
     messages = build_chat_messages(
-        user_message,
+        model_text,
         mode,
         memory_context=memory_context,
         recent_messages=recent,
         summary_text=summary_text,
     )
-    text = _provider.generate_messages(messages, max_tokens=1024)
+
+    images_arg = None
+    if image is not None:
+        images_arg = [{"media_type": image["media_type"], "data": image["data"]}]
+        # Persist the shared image so it also appears in the Images tab. No fact
+        # extraction on this path — this is a conversational reaction, not ingest.
+        try:
+            save_image(image["filename"], image["bytes"])
+        except Exception as e:  # persistence must never break the chat reply
+            print(f"[conversation_service] save_image failed: {e}")
+
+    text = _provider.generate_messages(messages, max_tokens=1024, images=images_arg)
+
+    # History stores a text placeholder for shared images — never base64.
+    history_user_text = user_message
+    if image is not None:
+        history_user_text = (f"{user_message}\n[shared an image]").strip() if user_message else "[shared an image]"
+
     # Never persist leaked/system-looking output into short-term history.
     if text and not looks_like_internal_echo(text):
-        append_exchange(conversation_id, user_message, text)
-        save_exchange(conversation_id, user_message, text, mode)
+        append_exchange(conversation_id, history_user_text, text)
+        save_exchange(conversation_id, history_user_text, text, mode)
         maybe_generate_summary()
         maybe_extract_facts()
         set_last_mode(conversation_id, mode)

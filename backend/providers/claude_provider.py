@@ -33,6 +33,46 @@ def _split_system_and_messages(
     return system, rest
 
 
+def _attach_images_to_last_user(
+    api_messages: list[dict],
+    images: list[dict[str, str]],
+) -> list[dict]:
+    """
+    Return a copy of ``api_messages`` where the most recent user turn carries the
+    given images as Anthropic vision content blocks. Each image is a dict with
+    ``media_type`` and ``data`` (base64). The text stays a text block, so the
+    plain-text path is unchanged when ``images`` is empty.
+    """
+    image_blocks = [
+        {
+            "type": "image",
+            "source": {
+                "type": "base64",
+                "media_type": img["media_type"],
+                "data": img["data"],
+            },
+        }
+        for img in images
+        if img.get("media_type") and img.get("data")
+    ]
+    if not image_blocks:
+        return api_messages
+
+    out = [dict(m) for m in api_messages]
+    for m in reversed(out):
+        if m.get("role") == "user":
+            text = m.get("content") if isinstance(m.get("content"), str) else ""
+            content_blocks: list[dict] = list(image_blocks)
+            if text.strip():
+                content_blocks.append({"type": "text", "text": text})
+            m["content"] = content_blocks
+            return out
+
+    # No prior user turn to attach to — synthesize one carrying just the images.
+    out.append({"role": "user", "content": list(image_blocks)})
+    return out
+
+
 def _message_text_content(message: object) -> str:
     parts: list[str] = []
     content = getattr(message, "content", None)
@@ -51,6 +91,7 @@ def _anthropic_messages(
     model: str,
     messages: list[dict[str, str]],
     max_tokens: int = 4096,
+    images: list[dict[str, str]] | None = None,
 ) -> str:
     if not (api_key or "").strip():
         raise RuntimeError(
@@ -58,6 +99,8 @@ def _anthropic_messages(
         )
 
     system, api_messages = _split_system_and_messages(messages)
+    if images:
+        api_messages = _attach_images_to_last_user(api_messages, images)
     client = Anthropic(api_key=api_key.strip())
     try:
         kwargs: dict[str, object] = {
@@ -106,10 +149,16 @@ class ClaudeProvider:
 
         self._settings = settings or get_settings()
 
-    def generate_messages(self, messages: list[dict[str, str]], max_tokens: int = 4096) -> str:
+    def generate_messages(
+        self,
+        messages: list[dict[str, str]],
+        max_tokens: int = 4096,
+        images: list[dict[str, str]] | None = None,
+    ) -> str:
         return _anthropic_messages(
             api_key=self._settings.anthropic_api_key,
             model=self._settings.claude_model,
             messages=messages,
             max_tokens=max_tokens,
+            images=images,
         )

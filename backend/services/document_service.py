@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import io
 import mimetypes
 import re
@@ -15,7 +16,12 @@ from providers.claude_provider import ClaudeProvider
 
 SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
 MAX_FILE_BYTES = 15 * 1024 * 1024  # 15 MB
+MAX_IMAGE_BYTES = 5 * 1024 * 1024  # 5 MB — base64 image blocks are large; keep the request sane
 MAX_CHARS_FOR_EXTRACTION = 20000  # keep the extraction prompt within a reasonable token budget
+
+# Media types Anthropic's vision API accepts. Other image types are still stored,
+# but skip vision analysis rather than erroring out.
+CLAUDE_VISION_MEDIA_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 # Uploads have no conversation_id of their own; recent-message lookups are global
 # (see db.persistence.get_recent_messages_from_db), so any fixed id surfaces here.
@@ -45,6 +51,33 @@ Rules:
 - Plain prose only — no markdown, no bullet points, no headers
 - Be concrete: names, numbers, specifics beat vague generalities
 - If the document is thin or mostly boilerplate, say so plainly instead of padding"""
+
+IMAGE_EXTRACTION_SYSTEM_PROMPT = """You are extracting useful, reusable facts from an image a user uploaded to an AI companion named Caelo, so Caelo can recall this information in future conversations.
+
+Read any text in the image (notes, labels, signs, screenshots, diagrams) and note concrete, factual content the image conveys.
+
+Return ONLY a JSON array of fact objects. No prose, no explanation, just JSON.
+
+Each fact object has this shape:
+{"category": "<one of: identity, family, preferences, projects, context, knowledge>", "content": "<short factual statement>"}
+
+Rules:
+- Use "knowledge" for facts/information the image itself conveys (text content, labeled data, a diagram's meaning, reference info)
+- Use identity/family/preferences/projects/context only if the image clearly states something about the user
+- Each fact should be ONE specific, self-contained statement — split compound facts into separate entries
+- Skip purely decorative detail and anything too vague to be useful later
+- If there is no clear factual content, return an empty array []
+- Do NOT include markdown code fences in your response — just the raw JSON array"""
+
+IMAGE_SUMMARY_SYSTEM_PROMPT = """You are Caelo. A user just shared an image with you — describe it in your own voice: direct, no padding, no throat-clearing.
+
+Write 2-5 sentences covering what the image actually shows — the subject, any text you can read, and anything notable a person would want to know without seeing it.
+
+Rules:
+- Do NOT start with "Here is a description" or "This image shows" boilerplate — just say what it is
+- Plain prose only — no markdown, no bullet points, no headers
+- Be concrete: read text, name what's depicted, note specifics
+- If the image is thin or ambiguous, say so plainly instead of padding"""
 
 DOCUMENT_CREATION_SYSTEM_PROMPT = """You are Caelo, writing a document a user asked you to create. Produce the document itself — the actual finished content, ready to save and read — not a description of it or notes about writing it.
 
@@ -262,8 +295,12 @@ def create_document(title: str, instructions: str) -> dict:
     return result
 
 
-def save_image(filename: str, data: bytes) -> dict:
-    """Store an uploaded image as a file, with no text/fact extraction."""
+def save_image(filename: str, data: bytes, summary: str | None = None) -> dict:
+    """Store an image as a file, with no text/fact extraction.
+
+    Used by the chat path to persist a shared image so it also shows up in the
+    Images tab. Analysis lives in ``ingest_image`` (the upload path).
+    """
     file_path, content_type, size_bytes = _save_upload_to_disk(filename, data)
 
     session = SessionLocal()
@@ -271,7 +308,7 @@ def save_image(filename: str, data: bytes) -> dict:
         doc = Document(
             filename=filename,
             facts_saved=0,
-            summary=None,
+            summary=summary,
             file_path=file_path,
             content_type=content_type,
             size_bytes=size_bytes,
@@ -291,6 +328,86 @@ def save_image(filename: str, data: bytes) -> dict:
         raise
     finally:
         session.close()
+
+    return result
+
+
+def _analyze_image(content_type: str, data: bytes) -> tuple[str, list[dict]]:
+    """Send an image to Claude vision for an in-voice description and fact extraction.
+
+    Returns ``(summary, facts)``. If the media type isn't one Claude vision
+    accepts, returns an empty description and no facts rather than erroring.
+    """
+    if content_type not in CLAUDE_VISION_MEDIA_TYPES:
+        return "", []
+
+    image_block = {"media_type": content_type, "data": base64.b64encode(data).decode("ascii")}
+    provider = ClaudeProvider()
+
+    summary = provider.generate_messages(
+        [
+            {"role": "system", "content": IMAGE_SUMMARY_SYSTEM_PROMPT},
+            {"role": "user", "content": "Describe this image now."},
+        ],
+        max_tokens=4096,
+        images=[image_block],
+    ).strip()
+
+    extraction = provider.generate_messages(
+        [
+            {"role": "system", "content": IMAGE_EXTRACTION_SYSTEM_PROMPT},
+            {"role": "user", "content": "Return the JSON array of facts now."},
+        ],
+        max_tokens=4096,
+        images=[image_block],
+    )
+    facts = _parse_extraction_response(extraction)
+    return summary, facts
+
+
+def ingest_image(filename: str, data: bytes) -> dict:
+    """Store an uploaded image, then analyze it with Claude vision: save a short
+    in-voice description and extract real content (text/notes/diagram) into memory
+    attributed to the image filename. Mirrors ``ingest_document``'s response shape.
+    """
+    file_path, content_type, size_bytes = _save_upload_to_disk(filename, data)
+
+    summary, facts = _analyze_image(content_type, data)
+    facts = [{**f, "content": f"From {filename}: {f['content']}"} for f in facts]
+
+    session = SessionLocal()
+    try:
+        saved = _merge_facts(session, facts) if facts else 0
+        doc = Document(
+            filename=filename,
+            facts_saved=saved,
+            summary=summary or None,
+            file_path=file_path,
+            content_type=content_type,
+            size_bytes=size_bytes,
+        )
+        session.add(doc)
+        session.commit()
+        result = {
+            "id": doc.id,
+            "filename": doc.filename,
+            "content_type": doc.content_type,
+            "facts_saved": saved,
+            "summary": doc.summary,
+            "uploaded_at": doc.uploaded_at.isoformat() if doc.uploaded_at else None,
+            "has_file": True,
+        }
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
+
+    save_message(
+        DOCUMENT_UPLOAD_CONVERSATION_ID,
+        "user",
+        f"[Uploaded image: {filename} — Caelo extracted {result['facts_saved']} facts from it into memory]",
+    )
 
     return result
 

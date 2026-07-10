@@ -7,6 +7,14 @@ type ChatMessage = {
   role: 'user' | 'assistant' | 'system'
   text: string
   mode?: string
+  imageUrl?: string
+}
+
+type PreparedImage = {
+  mediaType: string
+  base64: string
+  dataUrl: string
+  filename: string
 }
 
 type ChatApiResponse = {
@@ -51,6 +59,65 @@ type DocumentRecord = {
 type Panel = 'none' | 'history' | 'documents' | 'images'
 
 const ACCEPTED_DOCUMENT_EXTENSIONS = '.txt,.md,.pdf,.docx'
+
+// Base64 image blocks are large — keep them under the backend's limit and
+// downscale big photos client-side so we don't ship a 12MP original.
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const MAX_IMAGE_DIM = 1568
+const CLAUDE_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+
+function base64Bytes(base64: string): number {
+  // Decoded length of a base64 string (ignoring padding chars).
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+  return Math.floor((base64.length * 3) / 4) - padding
+}
+
+function readAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(new Error('Could not read the image.'))
+    reader.readAsDataURL(file)
+  })
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const el = new Image()
+    el.onload = () => resolve(el)
+    el.onerror = () => reject(new Error('Could not decode the image.'))
+    el.src = src
+  })
+}
+
+// Read a File into a base64 payload Claude vision accepts. Downscales anything
+// larger than MAX_IMAGE_DIM and re-encodes unsupported types to JPEG. Throws a
+// user-facing Error if the result is still over the size limit.
+async function prepareImage(file: File): Promise<PreparedImage> {
+  const originalUrl = await readAsDataUrl(file)
+  const img = await loadImage(originalUrl)
+  const scale = Math.min(1, MAX_IMAGE_DIM / Math.max(img.width, img.height))
+  const supported = CLAUDE_IMAGE_TYPES.has(file.type)
+
+  let mediaType = file.type
+  let dataUrl = originalUrl
+  if (scale < 1 || !supported) {
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(img.width * scale))
+    canvas.height = Math.max(1, Math.round(img.height * scale))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Could not process the image.')
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+    mediaType = 'image/jpeg'
+  }
+
+  const base64 = dataUrl.split(',')[1] ?? ''
+  if (base64Bytes(base64) > MAX_IMAGE_BYTES) {
+    throw new Error(`Image is too large. Max size is ${MAX_IMAGE_BYTES / (1024 * 1024)} MB.`)
+  }
+  return { mediaType, base64, dataUrl, filename: file.name || 'image' }
+}
 
 function isImage(d: DocumentRecord): boolean {
   return (d.content_type ?? '').startsWith('image/')
@@ -133,6 +200,11 @@ const IconRefresh = () => (
     <path d="M21 3v5h-5" />
   </svg>
 )
+const IconAttach = () => (
+  <svg {...svgProps}>
+    <path d="M21.44 11.05 12.25 20.24a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-9.2 9.19a1 1 0 0 1-1.41-1.41l8.48-8.49" />
+  </svg>
+)
 
 // <img> can't send auth headers, so fetch the file as a blob and use an object URL.
 function AuthImage({ id, className, onClick }: { id: number; className?: string; onClick?: () => void }) {
@@ -179,12 +251,18 @@ function App() {
   const [creating, setCreating] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [imageUploading, setImageUploading] = useState(false)
+  const [imageNote, setImageNote] = useState('')
   const [viewerImageId, setViewerImageId] = useState<number | null>(null)
+  const [chatImage, setChatImage] = useState<PreparedImage | null>(null)
   const listEndRef = useRef<HTMLDivElement | null>(null)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const imageInputRef = useRef<HTMLInputElement | null>(null)
+  const chatImageInputRef = useRef<HTMLInputElement | null>(null)
 
-  const canSend = useMemo(() => input.trim().length > 0 && !loading, [input, loading])
+  const canSend = useMemo(
+    () => (input.trim().length > 0 || chatImage !== null) && !loading,
+    [input, chatImage, loading],
+  )
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, conversationId)
@@ -193,6 +271,35 @@ function App() {
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
+
+  // Image viewer: closeable via Escape and hardware/browser back, and it locks
+  // background scroll while open. The X button and backdrop close it directly.
+  useEffect(() => {
+    if (viewerImageId === null) return
+    const close = () => setViewerImageId(null)
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close()
+    }
+    const onPop = () => close()
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('popstate', onPop)
+    // Push a history entry so Android back / swipe-back dismisses the viewer
+    // instead of leaving the app.
+    window.history.pushState({ caeloViewer: true }, '')
+    const prevOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('popstate', onPop)
+      document.body.style.overflow = prevOverflow
+      // If we closed via the X/backdrop/Escape, our pushed entry is still on top —
+      // pop it so back doesn't just re-trigger a no-op. If we closed via back,
+      // it's already gone and this is skipped.
+      if (window.history.state && window.history.state.caeloViewer) {
+        window.history.back()
+      }
+    }
+  }, [viewerImageId])
 
   const appendMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message])
@@ -203,7 +310,8 @@ function App() {
     setError('')
 
     const trimmed = input.trim()
-    if (!trimmed) {
+    const image = chatImage
+    if (!trimmed && !image) {
       setError('Please enter a message.')
       return
     }
@@ -212,8 +320,10 @@ function App() {
       id: `${Date.now()}-user`,
       role: 'user',
       text: trimmed,
+      imageUrl: image?.dataUrl,
     })
     setInput('')
+    setChatImage(null)
     setLoading(true)
     try {
       const apiResponse = await fetch(`${API_BASE}/chat/`, {
@@ -222,6 +332,9 @@ function App() {
         body: JSON.stringify({
           message: trimmed,
           conversation_id: conversationId,
+          image: image
+            ? { media_type: image.mediaType, data: image.base64, filename: image.filename }
+            : undefined,
         }),
       })
 
@@ -351,6 +464,7 @@ function App() {
   const openImages = async () => {
     setPanel('images')
     setPanelError('')
+    setImageNote('')
     setPanelLoading(true)
     try {
       await refreshDocuments()
@@ -368,6 +482,7 @@ function App() {
     if (!file) return
 
     setPanelError('')
+    setImageNote('')
     setImageUploading(true)
     try {
       const formData = new FormData()
@@ -377,10 +492,13 @@ function App() {
         headers: AUTH_HEADERS,
         body: formData,
       })
-      const data: DocumentRecord & { error_message?: string } = await res.json()
+      const data: DocumentRecord & { summary?: string; error_message?: string } = await res.json()
       if (!res.ok || data.error_message) {
         setPanelError(data.error_message ?? `Upload failed with status ${res.status}`)
         return
+      }
+      if (data.summary && data.summary.trim()) {
+        setImageNote(data.summary.trim())
       }
       await refreshDocuments()
     } catch (err) {
@@ -388,6 +506,20 @@ function App() {
       setPanelError('Could not upload the image.')
     } finally {
       setImageUploading(false)
+    }
+  }
+
+  const handleChatImageSelected = async (event: FormEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0]
+    event.currentTarget.value = ''
+    if (!file) return
+    setError('')
+    try {
+      const prepared = await prepareImage(file)
+      setChatImage(prepared)
+    } catch (err) {
+      console.error(err)
+      setError(err instanceof Error ? err.message : 'Could not attach that image.')
     }
   }
 
@@ -513,6 +645,13 @@ function App() {
         onChange={handleImageSelected}
         disabled={imageUploading}
       />
+      <input
+        ref={chatImageInputRef}
+        type="file"
+        accept="image/*"
+        className="upload-input"
+        onChange={handleChatImageSelected}
+      />
 
       {panel === 'none' ? (
         <div className="screen chat-screen">
@@ -526,7 +665,10 @@ function App() {
             ) : (
               messages.map((msg) => (
                 <article key={msg.id} className={`bubble ${msg.role}`}>
-                  <p>{msg.text}</p>
+                  {msg.imageUrl ? (
+                    <img src={msg.imageUrl} className="bubble-image" alt="shared" />
+                  ) : null}
+                  {msg.text ? <p>{msg.text}</p> : null}
                   {msg.role === 'assistant' && msg.mode ? (
                     <span className="mode-tag">{msg.mode}</span>
                   ) : null}
@@ -539,19 +681,46 @@ function App() {
           </section>
 
           <form onSubmit={handleSubmit} className="composer">
-            <textarea
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              placeholder="Message Caelo..."
-              disabled={loading}
-              rows={1}
-            />
-            <button type="submit" className="send-btn" disabled={!canSend} aria-label="Send">
-              <svg {...svgProps}>
-                <path d="M5 12h14" />
-                <path d="m13 6 6 6-6 6" />
-              </svg>
-            </button>
+            {chatImage ? (
+              <div className="composer-attachment">
+                <img src={chatImage.dataUrl} className="attachment-thumb" alt="attachment" />
+                <button
+                  type="button"
+                  className="attachment-remove"
+                  onClick={() => setChatImage(null)}
+                  aria-label="Remove image"
+                >
+                  <svg {...svgProps}>
+                    <path d="M6 6l12 12" />
+                    <path d="M18 6 6 18" />
+                  </svg>
+                </button>
+              </div>
+            ) : null}
+            <div className="composer-row">
+              <button
+                type="button"
+                className="attach-btn"
+                onClick={() => chatImageInputRef.current?.click()}
+                disabled={loading}
+                aria-label="Attach image"
+              >
+                <IconAttach />
+              </button>
+              <textarea
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                placeholder="Message Caelo..."
+                disabled={loading}
+                rows={1}
+              />
+              <button type="submit" className="send-btn" disabled={!canSend} aria-label="Send">
+                <svg {...svgProps}>
+                  <path d="M5 12h14" />
+                  <path d="m13 6 6 6-6 6" />
+                </svg>
+              </button>
+            </div>
           </form>
         </div>
       ) : (
@@ -667,6 +836,11 @@ function App() {
                 >
                   {imageUploading ? 'Uploading...' : 'Upload image'}
                 </button>
+                {imageNote ? (
+                  <div className="list-item static">
+                    <p className="list-item-summary">{imageNote}</p>
+                  </div>
+                ) : null}
                 {documents.filter(isImage).length === 0 && !panelLoading ? (
                   <p className="empty-state">No images yet.</p>
                 ) : (
@@ -689,6 +863,17 @@ function App() {
 
       {viewerImageId !== null ? (
         <div className="image-viewer" onClick={() => setViewerImageId(null)}>
+          <button
+            type="button"
+            className="viewer-close"
+            onClick={() => setViewerImageId(null)}
+            aria-label="Close image"
+          >
+            <svg {...svgProps}>
+              <path d="M6 6l12 12" />
+              <path d="M18 6 6 18" />
+            </svg>
+          </button>
           <AuthImage id={viewerImageId} className="viewer-img" />
         </div>
       ) : null}
