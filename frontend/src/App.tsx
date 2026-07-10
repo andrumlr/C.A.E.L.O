@@ -194,6 +194,21 @@ function App() {
     listEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, loading])
 
+  // While the full-screen image viewer is open, close it on Escape and lock
+  // background scroll. Listener and scroll lock are torn down on close/cleanup.
+  useEffect(() => {
+    if (viewerImageId === null) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setViewerImageId(null)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    document.body.style.overflow = 'hidden'
+    return () => {
+      window.removeEventListener('keydown', onKeyDown)
+      document.body.style.overflow = ''
+    }
+  }, [viewerImageId])
+
   const appendMessage = (message: ChatMessage) => {
     setMessages((prev) => [...prev, message])
   }
@@ -689,7 +704,20 @@ function App() {
 
       {viewerImageId !== null ? (
         <div className="image-viewer" onClick={() => setViewerImageId(null)}>
-          <AuthImage id={viewerImageId} className="viewer-img" />
+          <button
+            type="button"
+            className="viewer-close"
+            onClick={() => setViewerImageId(null)}
+            aria-label="Close"
+          >
+            <svg {...svgProps}>
+              <path d="M6 6l12 12" />
+              <path d="M18 6 6 18" />
+            </svg>
+          </button>
+          <div className="viewer-inner" onClick={(e) => e.stopPropagation()}>
+            <AuthImage id={viewerImageId} className="viewer-img" />
+          </div>
         </div>
       ) : null}
 
