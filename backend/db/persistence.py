@@ -115,6 +115,33 @@ def get_recent_messages_from_db(limit: int = 20) -> list[dict[str, str]]:
         session.close()
 
 
+def get_last_message_age_seconds() -> float | None:
+    """
+    Return the number of seconds since the most recent stored message, or None
+    if there are no messages yet.
+
+    Message.created_at is stored as NAIVE UTC (the model defaults to
+    datetime.utcnow), so the elapsed time is measured against datetime.utcnow()
+    — a naive UTC "now". Do not compare against datetime.now() or a timezone-aware
+    time; that would be off by the local UTC offset.
+    """
+    session = SessionLocal()
+    try:
+        row = (
+            session.query(Message)
+            .order_by(Message.created_at.desc())
+            .first()
+        )
+        if row is None or row.created_at is None:
+            return None
+        return (datetime.utcnow() - row.created_at).total_seconds()
+    except Exception as e:
+        print(f"[persistence] get_last_message_age_seconds failed: {e}")
+        return None
+    finally:
+        session.close()
+
+
 def list_conversations(limit: int = 50) -> list[dict]:
     """Return recent conversations, newest first, each with a preview of its first message."""
     session = SessionLocal()

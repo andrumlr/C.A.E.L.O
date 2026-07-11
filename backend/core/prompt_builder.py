@@ -207,6 +207,35 @@ def _current_time_context() -> str:
     return now.strftime(f"Current date and time: %A, %B %d, %Y, {hour_12}:%M %p %Z")
 
 
+# Gaps shorter than this read as one continuous conversation, so mentioning the
+# elapsed time would be noise. Above it, the pause is worth Caelo knowing about.
+_SHORT_GAP_SECONDS = 15 * 60
+
+
+def _humanize_elapsed(age_seconds: float) -> str:
+    """Turn an elapsed-seconds value into a rough human phrase (minutes/hours/days)."""
+    if age_seconds < 3600:
+        n = round(age_seconds / 60)
+        return f"{n} minute" if n == 1 else f"{n} minutes"
+    if age_seconds < 86400:
+        n = round(age_seconds / 3600)
+        return f"{n} hour" if n == 1 else f"{n} hours"
+    n = round(age_seconds / 86400)
+    return f"{n} day" if n == 1 else f"{n} days"
+
+
+def _time_since_last_message_context(age_seconds: float | None) -> str:
+    """
+    Human-readable note about the gap since the user's previous message, for the
+    system block. Returns "" when there's no prior message or the gap is short
+    enough to be conversationally irrelevant — so short back-and-forth turns get
+    no note at all.
+    """
+    if age_seconds is None or age_seconds < _SHORT_GAP_SECONDS:
+        return ""
+    return f"Time since the user's previous message: about {_humanize_elapsed(age_seconds)}."
+
+
 def build_chat_messages(
     user_input: str,
     mode: str,
@@ -214,6 +243,7 @@ def build_chat_messages(
     memory_context: str = "",
     recent_messages: list[dict[str, str]] | None = None,
     summary_text: str = "",
+    last_message_age_seconds: float | None = None,
 ) -> list[dict[str, str]]:
     """
     Build Ollama messages: one system block (identity, runtime safeguards, active mode,
@@ -246,6 +276,10 @@ def build_chat_messages(
         system,
         _current_time_context(),
     ]
+
+    elapsed_note = _time_since_last_message_context(last_message_age_seconds)
+    if elapsed_note:
+        system_parts.append(elapsed_note)
 
     if summary_text and summary_text.strip():
         system_parts.append(

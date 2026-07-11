@@ -11,7 +11,7 @@ import re
 from core.config import get_settings
 from core.mode_selector import select_mode
 from core.prompt_builder import build_chat_messages
-from db.persistence import save_exchange, get_recent_messages_from_db
+from db.persistence import save_exchange, get_recent_messages_from_db, get_last_message_age_seconds
 from memory.fact_extractor import maybe_extract_facts
 from memory.facts import get_active_facts, format_facts_for_prompt
 from memory.summary_generator import maybe_generate_summary, get_current_summary
@@ -137,6 +137,10 @@ def run_chat(
     else:
         recent_raw = get_recent_messages(conversation_id)
 
+    # How long since the previous message — measured before this turn is saved,
+    # so Caelo can tell a quick reply from a days-later one.
+    last_message_age_seconds = get_last_message_age_seconds()
+
     # Skip any historical assistant turns that look like leaked internals.
     recent = [
         m
@@ -160,6 +164,7 @@ def run_chat(
         memory_context=memory_context,
         recent_messages=recent,
         summary_text=summary_text,
+        last_message_age_seconds=last_message_age_seconds,
     )
 
     images_arg = None
