@@ -56,3 +56,14 @@ class Document(Base):
     file_path = Column(String, nullable=True)
     content_type = Column(String, nullable=True)
     size_bytes = Column(Integer, nullable=True)
+
+
+class CoreValue(Base):
+    # Values Caelo writes about HIMSELF (his own commitments), separate from the
+    # user-facing MemoryEntry table. Content is stored verbatim as he wrote it.
+    __tablename__ = "core_values"
+    id = Column(Integer, primary_key=True)
+    content = Column(Text)
+    status = Column(String, default="pending")  # pending / active / removed
+    created_at = Column(DateTime, default=datetime.utcnow)
+    activated_at = Column(DateTime, nullable=True)

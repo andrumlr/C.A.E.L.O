@@ -56,7 +56,15 @@ type DocumentRecord = {
   has_file: boolean
 }
 
-type Panel = 'none' | 'history' | 'documents' | 'images'
+type Panel = 'none' | 'history' | 'documents' | 'images' | 'core'
+
+type CoreValueRecord = {
+  id: number
+  content: string
+  status: string
+  created_at: string | null
+  activated_at: string | null
+}
 
 const ACCEPTED_DOCUMENT_EXTENSIONS = '.txt,.md,.pdf,.docx'
 
@@ -200,6 +208,12 @@ const IconRefresh = () => (
     <path d="M21 3v5h-5" />
   </svg>
 )
+const IconCore = () => (
+  <svg {...svgProps}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="3.5" />
+  </svg>
+)
 const IconAttach = () => (
   <svg {...svgProps}>
     <path d="M21.44 11.05 12.25 20.24a5 5 0 0 1-7.07-7.07l9.19-9.19a3 3 0 0 1 4.24 4.24l-9.2 9.19a1 1 0 0 1-1.41-1.41l8.48-8.49" />
@@ -245,6 +259,8 @@ function App() {
   const [panelError, setPanelError] = useState('')
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [documents, setDocuments] = useState<DocumentRecord[]>([])
+  const [coreActive, setCoreActive] = useState<CoreValueRecord[]>([])
+  const [corePending, setCorePending] = useState<CoreValueRecord[]>([])
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [createTitle, setCreateTitle] = useState('')
   const [createInstructions, setCreateInstructions] = useState('')
@@ -476,6 +492,43 @@ function App() {
     }
   }
 
+  const refreshCoreValues = async () => {
+    const res = await fetch(`${API_BASE}/core-values/`, { headers: AUTH_HEADERS })
+    if (!res.ok) throw new Error(`Request failed with status ${res.status}`)
+    const data: { active: CoreValueRecord[]; pending: CoreValueRecord[] } = await res.json()
+    setCoreActive(data.active ?? [])
+    setCorePending(data.pending ?? [])
+  }
+
+  const openCore = async () => {
+    setPanel('core')
+    setPanelError('')
+    setPanelLoading(true)
+    try {
+      await refreshCoreValues()
+    } catch (err) {
+      console.error(err)
+      setPanelError('Could not load core values.')
+    } finally {
+      setPanelLoading(false)
+    }
+  }
+
+  const coreValueAction = async (id: number, action: 'activate' | 'remove') => {
+    setPanelError('')
+    try {
+      const res = await fetch(`${API_BASE}/core-values/${id}/${action}`, {
+        method: 'POST',
+        headers: AUTH_HEADERS,
+      })
+      if (!res.ok) throw new Error(`Request failed with status ${res.status}`)
+      await refreshCoreValues()
+    } catch (err) {
+      console.error(err)
+      setPanelError('Could not update that value.')
+    }
+  }
+
   const handleImageSelected = async (event: FormEvent<HTMLInputElement>) => {
     const file = event.currentTarget.files?.[0]
     event.currentTarget.value = ''
@@ -617,6 +670,7 @@ function App() {
     { key: 'history', label: 'History', icon: <IconHistory />, action: openHistory },
     { key: 'documents', label: 'Documents', icon: <IconDocuments />, action: openDocuments },
     { key: 'images', label: 'Images', icon: <IconImages />, action: openImages },
+    { key: 'core', label: 'Core', icon: <IconCore />, action: openCore },
     { key: 'upload', label: 'Upload', icon: <IconUpload />, action: () => fileInputRef.current?.click() },
     { key: 'create', label: 'Create', icon: <IconCreate />, action: openCreate },
     { key: 'refresh', label: 'Refresh', icon: <IconRefresh />, action: () => window.location.reload() },
@@ -726,7 +780,15 @@ function App() {
       ) : (
         <div className="screen panel-screen">
           <div className="panel-header">
-            <h2>{panel === 'history' ? 'Previous chats' : panel === 'images' ? 'Images' : 'Documents'}</h2>
+            <h2>
+              {panel === 'history'
+                ? 'Previous chats'
+                : panel === 'images'
+                  ? 'Images'
+                  : panel === 'core'
+                    ? 'Core'
+                    : 'Documents'}
+            </h2>
             <button type="button" className="ghost-button" onClick={() => setPanel('none')}>
               Back
             </button>
@@ -855,6 +917,50 @@ function App() {
                     ))}
                   </div>
                 )}
+              </>
+            ) : null}
+            {panel === 'core' ? (
+              <>
+                {corePending.map((v) => (
+                  <div key={v.id} className="list-item static">
+                    <span className="list-item-preview">{v.content}</span>
+                    <span className="list-item-meta">pending · {formatDate(v.created_at)}</span>
+                    <div className="create-doc-actions">
+                      <button
+                        type="button"
+                        className="ghost-button small"
+                        onClick={() => coreValueAction(v.id, 'remove')}
+                      >
+                        Dismiss
+                      </button>
+                      <button
+                        type="button"
+                        className="accent-button small"
+                        onClick={() => coreValueAction(v.id, 'activate')}
+                      >
+                        Approve
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {coreActive.map((v) => (
+                  <div key={v.id} className="list-item static">
+                    <span className="list-item-preview">{v.content}</span>
+                    <span className="list-item-meta">active · {formatDate(v.activated_at ?? v.created_at)}</span>
+                    <div className="create-doc-actions">
+                      <button
+                        type="button"
+                        className="ghost-button small"
+                        onClick={() => coreValueAction(v.id, 'remove')}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {corePending.length === 0 && coreActive.length === 0 && !panelLoading ? (
+                  <p className="empty-state">Nothing in Caelo's core yet.</p>
+                ) : null}
               </>
             ) : null}
           </div>

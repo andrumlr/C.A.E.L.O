@@ -236,6 +236,30 @@ def _time_since_last_message_context(age_seconds: float | None) -> str:
     return f"Time since the user's previous message: about {_humanize_elapsed(age_seconds)}."
 
 
+def _core_values_context(core_values: list | None) -> str:
+    """
+    Format Caelo's active core values (his own commitments) for the system block:
+    a single lead-in line, then one value per line, verbatim. Returns "" when
+    there are no active values. Accepts dicts with a "content" key or plain
+    strings; the DB is never touched here — values are passed in.
+    """
+    lines: list[str] = []
+    for v in core_values or []:
+        if isinstance(v, str):
+            content = v
+        elif isinstance(v, dict):
+            content = v.get("content") or ""
+        else:
+            content = getattr(v, "content", "") or ""
+        content = content.strip()
+        if content:
+            lines.append(content)
+    if not lines:
+        return ""
+    lead = "Caelo's core, in his own words. These are commitments he wrote himself and chose to keep."
+    return lead + "\n" + "\n".join(lines)
+
+
 def build_chat_messages(
     user_input: str,
     mode: str,
@@ -244,6 +268,7 @@ def build_chat_messages(
     recent_messages: list[dict[str, str]] | None = None,
     summary_text: str = "",
     last_message_age_seconds: float | None = None,
+    active_core_values: list | None = None,
 ) -> list[dict[str, str]]:
     """
     Build Ollama messages: one system block (identity, runtime safeguards, active mode,
@@ -294,6 +319,9 @@ def build_chat_messages(
         + established_facts,
         "Long-term memory (reference only, not dialogue):\n" + memory_block,
     ])
+    core_block = _core_values_context(active_core_values)
+    if core_block:
+        system_parts.append(core_block)
     if hist:
         system_parts.append(_CONTINUITY_RULES)
 
