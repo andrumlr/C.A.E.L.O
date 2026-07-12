@@ -12,6 +12,7 @@ from core.config import get_settings
 from core.mode_selector import select_mode
 from core.prompt_builder import build_chat_messages
 from db.persistence import save_exchange, get_recent_messages_from_db, get_last_message_age_seconds
+from memory.core_values import get_active_core_values, propose_core_value
 from memory.fact_extractor import maybe_extract_facts
 from memory.facts import get_active_facts, format_facts_for_prompt
 from memory.summary_generator import maybe_generate_summary, get_current_summary
@@ -125,6 +126,8 @@ def run_chat(
     if not memory_context.strip():
         memory_context = format_facts_for_prompt(get_active_facts())
 
+    active_core_values = get_active_core_values()
+
     # An image-only turn still needs a mode; treat the empty text as a light
     # presence turn so mode selection has something to work with.
     mode_input = user_message or "[shared an image]"
@@ -165,6 +168,7 @@ def run_chat(
         recent_messages=recent,
         summary_text=summary_text,
         last_message_age_seconds=last_message_age_seconds,
+        active_core_values=active_core_values,
     )
 
     images_arg = None
@@ -178,6 +182,19 @@ def run_chat(
             print(f"[conversation_service] save_image failed: {e}")
 
     text = _provider.generate_messages(messages, max_tokens=1024, images=images_arg)
+
+    # Caelo may propose a value to his own core by writing a line starting with
+    # "Add to core:". Capture it as a pending value, but leave the line untouched
+    # in the reply/history — the user still sees it. Never let this break the chat.
+    try:
+        for line in (text or "").splitlines():
+            stripped = line.strip()
+            if stripped.lower().startswith("add to core:"):
+                proposed = stripped[len("add to core:"):].strip()
+                if proposed:
+                    propose_core_value(proposed)
+    except Exception as e:
+        print(f"[conversation_service] core value capture failed: {e}")
 
     # History stores a text placeholder for shared images — never base64.
     history_user_text = user_message
